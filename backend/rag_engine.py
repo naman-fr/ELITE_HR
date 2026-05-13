@@ -96,3 +96,23 @@ def handle_query(query):
     )
     
     return response.choices[0].message.content
+
+def get_excel_stats(file_path):
+    xl = pd.ExcelFile(file_path)
+    df_india = xl.parse("India Employee Database")
+    df_us = xl.parse("US Employee Database")
+    df_prod = xl.parse("Productivity")
+    
+    total_headcount = len(df_india) + len(df_us)
+    avg_prod = df_prod["Avg Hrs/Day"].mean()
+    
+    # Mock some others based on data if available, else defaults
+    dept_counts = pd.concat([df_india["Department"], df_us["Department"]]).value_counts().to_dict()
+    
+    return {
+        "headcount": total_headcount,
+        "avg_productivity": round(float(avg_prod), 1),
+        "compliance_risks": 8, # Placeholder or calc from Risk tab
+        "identity_health": 96, # Placeholder or calc from Keycloak tab
+        "departments": [{"label": k, "val": int(v)} for k, v in dept_counts.items()]
+    }

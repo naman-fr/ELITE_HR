@@ -10,6 +10,34 @@ export default function Dashboard() {
   ]);
   const [loading, setLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [stats, setStats] = useState({
+    headcount: 42,
+    avg_productivity: 8.4,
+    compliance_risks: 8,
+    identity_health: 96,
+    departments: [
+      { label: 'Engineering', val: 18 },
+      { label: 'Sales', val: 12 },
+      { label: 'Operations', val: 8 },
+      { label: 'HR', val: 4 }
+    ]
+  });
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/stats');
+      const data = await res.json();
+      if (!data.error) {
+        setStats(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stats', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -26,6 +54,12 @@ export default function Dashboard() {
       });
       const data = await res.json();
       setUploadStatus(data.status || 'Upload failed');
+      
+      // Refresh stats after upload
+      if (res.ok) {
+        fetchStats();
+      }
+
       setTimeout(() => setUploadStatus(''), 3000);
     } catch (err) {
       setUploadStatus('Error uploading file');
@@ -63,23 +97,23 @@ export default function Dashboard() {
             <section className="metrics-grid">
               <div className="glass-card metric-card">
                 <h3>Active Workforce</h3>
-                <div className="value">42</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.5rem' }}>+2 this month</div>
+                <div className="value">{stats.headcount}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.5rem' }}>Live Headcount</div>
               </div>
               <div className="glass-card metric-card">
                 <h3>Compliance Risks</h3>
-                <div className="value" style={{ color: 'var(--danger)' }}>08</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '0.5rem' }}>3 critical alerts</div>
+                <div className="value" style={{ color: 'var(--danger)' }}>{stats.compliance_risks.toString().padStart(2, '0')}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '0.5rem' }}>System Alerts</div>
               </div>
               <div className="glass-card metric-card">
                 <h3>Avg Productivity</h3>
-                <div className="value">8.4<span style={{ fontSize: '1rem', fontWeight: 500 }}>h</span></div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.5rem' }}>Above benchmark</div>
+                <div className="value">{stats.avg_productivity}<span style={{ fontSize: '1rem', fontWeight: 500 }}>h</span></div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.5rem' }}>Daily Average</div>
               </div>
               <div className="glass-card metric-card">
                 <h3>Identity Health</h3>
-                <div className="value">96<span style={{ fontSize: '1rem', fontWeight: 500 }}>%</span></div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>MFA Enrolled</div>
+                <div className="value">{stats.identity_health}<span style={{ fontSize: '1rem', fontWeight: 500 }}>%</span></div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>MFA Compliance</div>
               </div>
             </section>
 
@@ -136,19 +170,14 @@ export default function Dashboard() {
               <div style={{ background: 'var(--bg)', padding: '2rem', borderRadius: '2rem' }}>
                 <h4 style={{ marginBottom: '1rem' }}>Headcount Distribution</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {[
-                    { label: 'Engineering', val: 18, color: '#a7c0a7' },
-                    { label: 'Sales', val: 12, color: '#e6b38a' },
-                    { label: 'Operations', val: 8, color: '#d98888' },
-                    { label: 'HR', val: 4, color: '#88b088' }
-                  ].map(item => (
+                  {stats.departments.map(item => (
                     <div key={item.label}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
                         <span>{item.label}</span>
                         <span>{item.val} members</span>
                       </div>
                       <div style={{ height: '8px', background: '#eee', borderRadius: '4px' }}>
-                        <div style={{ height: '100%', width: `${(item.val / 18) * 100}%`, background: item.color, borderRadius: '4px' }}></div>
+                        <div style={{ height: '100%', width: `${(item.val / Math.max(...stats.departments.map(d => d.val))) * 100}%`, background: 'var(--accent)', borderRadius: '4px' }}></div>
                       </div>
                     </div>
                   ))}
@@ -157,7 +186,7 @@ export default function Dashboard() {
               <div style={{ background: 'var(--bg)', padding: '2rem', borderRadius: '2rem' }}>
                 <h4 style={{ marginBottom: '1rem' }}>Average Productivity (Monthly)</h4>
                 <div style={{ height: '200px', borderLeft: '2px solid var(--border)', borderBottom: '2px solid var(--border)', position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: '0 1rem' }}>
-                  {[7.2, 8.1, 7.8, 8.4, 8.9, 8.2].map((h, i) => (
+                  {[7.2, 8.1, 7.8, stats.avg_productivity, 8.9, 8.2].map((h, i) => (
                     <div key={i} style={{ width: '20px', height: `${(h / 10) * 100}%`, background: 'var(--accent)', borderRadius: '4px 4px 0 0' }}></div>
                   ))}
                 </div>
@@ -210,12 +239,12 @@ export default function Dashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
               <div style={{ padding: '2rem', background: 'var(--accent-soft)', borderRadius: '2.5rem', textAlign: 'center' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✅</div>
-                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>96% MFA</div>
+                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{stats.identity_health}% MFA</div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text)' }}>Overall Compliance</div>
               </div>
               <div style={{ padding: '2rem', background: 'var(--bg)', borderRadius: '2.5rem', textAlign: 'center', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🚨</div>
-                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>2 Orphans</div>
+                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{stats.compliance_risks / 4} Orphans</div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text)' }}>Pending Revocation</div>
               </div>
             </div>
