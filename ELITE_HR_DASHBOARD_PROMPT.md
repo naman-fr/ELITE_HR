@@ -12,7 +12,7 @@ It covers three interlocked layers:
 ```
 LAYER 1 ── Excel HR Analytics Dashboard  (data spine)
 LAYER 2 ── OpenAI RAG Engine             (intelligent assistant)
-LAYER 3 ── SecOps Integration            (Wazuh · Wazuh · Authentik)
+LAYER 3 ── SecOps Integration            (Wazuh · Wazuh · Keycloak)
 ```
 
 Paste the entire document as the **system prompt** (or first user message) when instructing the AI.  
@@ -68,7 +68,7 @@ Build a production HRMIS that a Fortune 500 CHRO would open in a board meeting.*
 │  └ Offboarded  │  ├ Excel Sheets     │  ├ DLP Violation Alerts    │
 │                │  ├ Wazuh      │  └ UEBA Anomaly Scores    │
 │  Power Query   │  ├ Wazuh         │                            │
-│  Named Ranges  │  ├ Authentik        │  Authentik Directory API  │
+│  Named Ranges  │  ├ Keycloak        │  Keycloak Directory API  │
 │  VBA Triggers  │  └ HR Policy Docs  │  ├ User Provisioning State  │
 │                │                    │  ├ MFA Compliance           │
 │                │                    │  └ Group Membership         │
@@ -100,7 +100,7 @@ Build a production HRMIS that a Fortune 500 CHRO would open in a board meeting.*
 | **Offboarded Resources** | Exit records for attrition calc | Visible |
 | **SecOps_Wazuh** | Endpoint risk feed (XDR) | Visible |
 | **SecOps_Wazuh_DLP** | Cloud access/DLP violations | Visible |
-| **SecOps_Authentik** | Identity & provisioning state | Visible |
+| **SecOps_Keycloak** | Identity & provisioning state | Visible |
 | **CALC** | Intermediate pivot calculations | Hidden |
 | **CONFIG** | Thresholds, API keys, lookup tables | Hidden |
 | **AI_CONTEXT** | Serialised context pushed to RAG engine | Hidden |
@@ -148,7 +148,7 @@ ROW 119    ── FOOTER / METADATA
 | Policy Breach Flag | TRUE/FALSE → Red if TRUE |
 | HR Recommended Action | Dynamic |
 
-**Authentik Sub-Panel**
+**Keycloak Sub-Panel**
 
 | Column | Content |
 |--------|---------|
@@ -164,10 +164,10 @@ ROW 119    ── FOOTER / METADATA
 ```excel
 =IF(AND(
   VLOOKUP(A{r}, 'Offboarded Resources'!A:G, 7, 0) <> "",
-  VLOOKUP(A{r}, SecOps_Authentik!A:H, 3, 0) = "Active"
+  VLOOKUP(A{r}, SecOps_Keycloak!A:H, 3, 0) = "Active"
 ), "🚨 ORPHANED ACCOUNT", "")
 ```
-*Flags any offboarded employee whose Authentik account is still active.*
+*Flags any offboarded employee whose Keycloak account is still active.*
 
 ---
 
@@ -196,7 +196,7 @@ HR Manager types question
  │     ├─ Live Excel sheet reader (Office.js / API)    │
  │     ├─ Wazuh API call (if SecOps intent)      │
  │     ├─ Wazuh API call (if DLP/access intent)     │
- │     └─ Authentik API call (if identity intent)      │
+ │     └─ Keycloak API call (if identity intent)      │
  │                                                     │
  │  3. PROMPT ASSEMBLER                                │
  │     └─ System prompt + retrieved context + query   │
@@ -268,7 +268,7 @@ You have access to real-time data from:
   • Risk register
   • Wazuh endpoint security feed
   • Wazuh cloud access & DLP logs
-  • Authentik identity directory
+  • Keycloak identity directory
 
 YOUR CAPABILITIES:
 1. Answer natural-language HR queries with data citations
@@ -309,7 +309,7 @@ Define these functions so GPT-4o can call live data on demand:
       "type": "object",
       "properties": {
         "employee_id": {"type": "string", "description": "Employee ID like IN1045 or US2019"},
-        "include_secops": {"type": "boolean", "description": "Include Wazuh/Wazuh/Authentik data"}
+        "include_secops": {"type": "boolean", "description": "Include Wazuh/Wazuh/Keycloak data"}
       },
       "required": ["employee_id"]
     }
@@ -364,8 +364,8 @@ Define these functions so GPT-4o can call live data on demand:
     }
   },
   {
-    "name": "get_Authentik_identity",
-    "description": "Get Authentik directory status, MFA, groups, and last login for an employee",
+    "name": "get_Keycloak_identity",
+    "description": "Get Keycloak directory status, MFA, groups, and last login for an employee",
     "parameters": {
       "type": "object",
       "properties": {
@@ -433,15 +433,15 @@ AI: [Calls get_employee_profile(IN1040, include_secops=True)]
 **Test 3 — Identity/Access troubleshooting**
 ```
 HR: "We offboarded Priya Harris in Q3. Is her access fully revoked?"
-AI: [Calls get_Authentik_identity(US2013, check_orphan=True)]
+AI: [Calls get_Keycloak_identity(US2013, check_orphan=True)]
     [Calls get_Wazuh_alerts(US2013, days_back=90)]
     → Returns: "🚨 ORPHANED ACCESS DETECTED — Priya Harris [US2013]
       Last Working Day: [from Offboarded tab]
-      Authentik Account: STILL ACTIVE as of today
-      Last Login: [date from Authentik]
+      Keycloak Account: STILL ACTIVE as of today
+      Last Login: [date from Keycloak]
       Wazuh: Device still reporting telemetry
       Required Actions:
-        1. Suspend Authentik account immediately → [Generate ticket]
+        1. Suspend Keycloak account immediately → [Generate ticket]
         2. Revoke all SSO app access
         3. Retrieve company device (IMEI: [from Wazuh])
         4. Escalate to IT Security within 2 hours"
@@ -499,12 +499,12 @@ AI: [Calls get_Wazuh_violations(IN1053, event_type="dlp")]
         5. Draft warning letter? → [Yes, generate document]"
 ```
 
-**Test 7 — Authentik provisioning query**
+**Test 7 — Keycloak provisioning query**
 ```
 HR: "We just hired Deepa Pillai on probation. Is her IT access set up correctly?"
-AI: [Calls get_Authentik_identity(IN1045)]
+AI: [Calls get_Keycloak_identity(IN1045)]
     → Returns: "Onboarding Check — Deepa Pillai [IN1045]
-      Authentik Status: ACTIVE ✅
+      Keycloak Status: ACTIVE ✅
       MFA: NOT ENROLLED ⚠
       Groups Assigned: finance-team, all-india
       Missing Groups: finance-sensitive-data (required for Sr. Analyst role)
@@ -608,12 +608,12 @@ Wazuh user email → Lookup Employee ID via India/US DB email column
 → Populate SecOps_Wazuh: EmpID | Email | DLP_Count | TopApp | AnomalyScore | PolicyBreach
 ```
 
-### 5.3  Authentik API
+### 5.3  Keycloak API
 
 **Authentication:**
 ```python
-JC_BASE = "https://console.Authentik.com/api"
-JC_KEY = config["Authentik_api_key"]
+JC_BASE = "https://console.Keycloak.com/api"
+JC_KEY = config["Keycloak_api_key"]
 
 headers = {
     "x-api-key": JC_KEY,
@@ -645,7 +645,7 @@ PUT /v1/systemusers/{user_id}
 Body: {"suspended": true}
 
 # 7. Get recent events / audit log
-GET /v1/events?searchTermFilter=system&service=Authentik_sso&startDate={date}
+GET /v1/events?searchTermFilter=system&service=Keycloak_sso&startDate={date}
 ```
 
 **Orphan Account Sweep (Excel formula + VBA hybrid):**
@@ -653,7 +653,7 @@ GET /v1/events?searchTermFilter=system&service=Authentik_sso&startDate={date}
 Sub CheckOrphanedAccounts()
     Dim offWs As Worksheet, jcWs As Worksheet
     Set offWs = Sheets("Offboarded Resources")
-    Set jcWs = Sheets("SecOps_Authentik")
+    Set jcWs = Sheets("SecOps_Keycloak")
     
     Dim lastRow As Long
     lastRow = offWs.Cells(offWs.Rows.Count, 1).End(xlUp).Row
@@ -663,7 +663,7 @@ Sub CheckOrphanedAccounts()
         Dim empID As String
         empID = offWs.Cells(i, 1).Value
         
-        ' Lookup Authentik status
+        ' Lookup Keycloak status
         Dim jcStatus As String
         jcStatus = Application.VLookup(empID, jcWs.Range("A:D"), 3, False)
         
@@ -688,7 +688,7 @@ Private Sub Workbook_Open()
     Application.StatusBar = "Initialising HR Intelligence Platform..."
     Call RefreshWazuhData
     Call RefreshWazuhData
-    Call RefreshAuthentikData
+    Call RefreshKeycloakData
     Call CheckOrphanedAccounts
     Call RecalculateDashboard
     Call TriggerProbationAlerts
@@ -878,10 +878,10 @@ End Sub
 
 ' ── SECOPS ─────────────────────────────────────────────────────────────────
 
-' Orphaned account flag (offboarded but still active in Authentik)
+' Orphaned account flag (offboarded but still active in Keycloak)
 =IF(AND(
   NOT(ISNA(MATCH(B2,'Offboarded Resources'!A:A,0))),
-  VLOOKUP(B2,SecOps_Authentik!A:D,3,FALSE)="Active"
+  VLOOKUP(B2,SecOps_Keycloak!A:D,3,FALSE)="Active"
 ),"🚨 ORPHANED ACCOUNT","")
 
 ' Combined flight risk score (HR + SecOps signals)
@@ -893,7 +893,7 @@ End Sub
 0)
 
 ' MFA gap count
-=COUNTIF(SecOps_Authentik!E:E,"No")
+=COUNTIF(SecOps_Keycloak!E:E,"No")
 
 ' High-risk device count (Wazuh risk score >70)
 =COUNTIF(SecOps_Wazuh!G:G,">70")
@@ -969,7 +969,7 @@ const HRAssistant = () => {
       <MessageThread messages={messages} />
       <QuickPrompts prompts={QUICK_PROMPTS} onSelect={sendMessage} />
       <InputBar onSend={sendMessage} />
-      <DataSourceBadges />                   {/* Shows: Excel ✅ | Wazuh ✅ | Wazuh ✅ | Authentik ✅ */}
+      <DataSourceBadges />                   {/* Shows: Excel ✅ | Wazuh ✅ | Wazuh ✅ | Keycloak ✅ */}
     </div>
   );
 };
@@ -1000,7 +1000,7 @@ The AI response renderer must handle:
 [ ] All Excel formulas return 0 errors (run scripts/recalc.py)
 [ ] Wazuh API OAuth2 token valid and tested
 [ ] Wazuh API token scoped to read-only (HR use)
-[ ] Authentik API key scoped: Users (read) + Groups (read) + Suspend (write HR only)
+[ ] Keycloak API key scoped: Users (read) + Groups (read) + Suspend (write HR only)
 [ ] OpenAI API key set with spend limit
 [ ] Vector store populated with all employee records
 [ ] Function calling tested for all 8 tool schemas
@@ -1010,7 +1010,7 @@ The AI response renderer must handle:
 [ ] RBAC: HR Managers see all | HR Business Partners see own dept | Employees see self only
 [ ] VBA macros signed with code certificate
 [ ] Workbook protected: Dashboard tab locked, source tabs editable by HR only
-[ ] API refresh scheduled: Wazuh/Wazuh/Authentik every 6 hours (cron job)
+[ ] API refresh scheduled: Wazuh/Wazuh/Keycloak every 6 hours (cron job)
 [ ] Alert emails configured: probation/LWD/orphan → hr-alerts@company.com
 [ ] Mobile-responsive chat UI tested on iOS/Android
 [ ] Offline mode: Dashboard works without API if SecOps tabs pre-populated
@@ -1036,7 +1036,7 @@ The AI response renderer must handle:
 1. Set up Excel workbook with all tabs
 2. Populate India/US DB from HR system export
 3. Build Finance, Productivity, Risk, RM tabs
-4. Add SecOps_Wazuh / _Wazuh / _Authentik tabs (empty)
+4. Add SecOps_Wazuh / _Wazuh / _Keycloak tabs (empty)
 5. Create CALC and CONFIG hidden sheets
 ```
 
@@ -1056,7 +1056,7 @@ The AI response renderer must handle:
 ```
 14. Write Wazuh API connector (Python or VBA)
 15. Write Wazuh API connector
-16. Write Authentik API connector
+16. Write Keycloak API connector
 17. Map API responses to SecOps tabs
 18. Build SecOps Intelligence Panel on Dashboard
 19. Add orphaned account detection formula + VBA
@@ -1104,9 +1104,9 @@ The AI response renderer must handle:
     "dlp_lookback_days": 30,
     "anomaly_threshold": 60
   },
-  "Authentik": {
-    "api_key": "ENV:Authentik_API_KEY",
-    "base_url": "https://console.Authentik.com/api",
+  "Keycloak": {
+    "api_key": "ENV:Keycloak_API_KEY",
+    "base_url": "https://console.Keycloak.com/api",
     "mfa_required": true,
     "orphan_check_on_offboard": true
   },
@@ -1144,7 +1144,7 @@ The AI response renderer must handle:
 |------|-----------|
 | **Wazuh Falcon** | EDR/XDR platform — monitors endpoint behaviour, quarantines threats, tracks device compliance |
 | **Wazuh** | SASE/CASB platform — monitors cloud app usage, enforces DLP policies, generates UEBA scores |
-| **Authentik** | Cloud directory — manages user identities, SSO, MFA, device binding, group policies |
+| **Keycloak** | Cloud directory — manages user identities, SSO, MFA, device binding, group policies |
 | **RAG** | Retrieval-Augmented Generation — AI answers grounded in retrieved documents, not just training data |
 | **UEBA** | User and Entity Behaviour Analytics — detects anomalies in user access patterns |
 | **CASB** | Cloud Access Security Broker — enforces security policies for cloud app usage |
@@ -1152,7 +1152,7 @@ The AI response renderer must handle:
 | **Orphaned Account** | A user account still active in identity systems after an employee has left |
 | **Flight Risk** | Employee with elevated probability of voluntary resignation, based on multi-signal scoring |
 | **PIP** | Performance Improvement Plan — formal HR document for underperforming employees |
-| **SSO** | Single Sign-On — one login for all enterprise applications, managed via Authentik |
+| **SSO** | Single Sign-On — one login for all enterprise applications, managed via Keycloak |
 | **EDR** | Endpoint Detection & Response — Wazuh's core capability |
 | **SASE** | Secure Access Service Edge — Wazuh's architecture combining network + security |
 

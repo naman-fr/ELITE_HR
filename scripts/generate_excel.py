@@ -80,7 +80,7 @@ def generate():
         df_prod.to_excel(writer, sheet_name="Productivity", index=False)
         
         # Create other tabs
-        for tab in ["Dashboard", "Risk Report", "RM Data", "Offboarded Resources", "SecOps_Wazuh", "SecOps_Wazuh_DLP", "SecOps_Authentik", "CALC", "CONFIG", "AI_CONTEXT"]:
+        for tab in ["Dashboard", "Risk Report", "RM Data", "Offboarded Resources", "SecOps_Wazuh", "SecOps_Wazuh_DLP", "SecOps_Keycloak", "CALC", "CONFIG", "AI_CONTEXT"]:
             pd.DataFrame().to_excel(writer, sheet_name=tab, index=False)
 
     # Apply styling to all sheets
