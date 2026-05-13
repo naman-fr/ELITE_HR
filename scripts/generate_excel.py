@@ -7,8 +7,8 @@ import os
 
 # Configuration
 OUTPUT_FILE = "ELITE_HR_Master_Dashboard.xlsx"
-NUM_INDIA_EMP = 30
-NUM_US_EMP = 10
+NUM_INDIA_EMP = 40
+NUM_US_EMP = 15
 
 def create_mock_data():
     # India Database

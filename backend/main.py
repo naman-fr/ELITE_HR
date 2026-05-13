@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import rag_engine
+import excel_transformer
 import os
 import shutil
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,17 +26,23 @@ def read_root():
 @app.post("/upload")
 async def upload_excel(file: UploadFile = File(...)):
     try:
-        temp_path = f"temp_{file.filename}"
+        temp_path = f"raw_{file.filename}"
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Ingest the uploaded file
-        rag_engine.ingest_data(temp_path)
+        # Transform the file to standard format
+        transformed_path = excel_transformer.transform_excel(temp_path)
         
-        # Move to master location for consistency
-        shutil.move(temp_path, "../ELITE_HR_Master_Dashboard.xlsx")
+        # Ingest the transformed data
+        rag_engine.ingest_data(transformed_path)
         
-        return {"status": "File uploaded and data ingested successfully"}
+        # Move to master location
+        shutil.move(transformed_path, "../ELITE_HR_Master_Dashboard.xlsx")
+        
+        # Cleanup
+        os.remove(temp_path)
+        
+        return {"status": "File transformed and data ingested successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
