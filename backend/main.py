@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import rag_engine
 import os
+import shutil
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="ELITE HR Intelligence API")
@@ -20,6 +21,23 @@ class QueryRequest(BaseModel):
 @app.get("/")
 def read_root():
     return {"status": "ELITE HR API is online"}
+
+@app.post("/upload")
+async def upload_excel(file: UploadFile = File(...)):
+    try:
+        temp_path = f"temp_{file.filename}"
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Ingest the uploaded file
+        rag_engine.ingest_data(temp_path)
+        
+        # Move to master location for consistency
+        shutil.move(temp_path, "../ELITE_HR_Master_Dashboard.xlsx")
+        
+        return {"status": "File uploaded and data ingested successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
 async def chat(request: QueryRequest):
