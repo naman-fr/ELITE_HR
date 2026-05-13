@@ -1,0 +1,111 @@
+' ⚡ ELITE HR INTELLIGENCE PLATFORM — VBA MACROS
+' Copy these into your .xlsm workbook
+
+' --- ThisWorkbook Module ---
+Private Sub Workbook_Open()
+    On Error Resume Next
+    Application.StatusBar = "Initialising HR Intelligence Platform..."
+    Call RefreshWazuhData
+    Call RefreshWazuhData
+    Call RefreshAuthentikData
+    Call CheckOrphanedAccounts
+    Call RecalculateDashboard
+    Call TriggerProbationAlerts
+    Call TriggerLWDAlerts
+    Application.StatusBar = "Dashboard ready — " & Format(Now(), "DD-MMM-YYYY HH:MM")
+End Sub
+
+Private Sub Workbook_SheetChange(ByVal Sh As Object, ByVal Target As Range)
+    Select Case Sh.Name
+        Case "India Employee Database", "US Employee Database"
+            Application.CalculateFullRebuild
+            Call RecalculateDashboard
+            Call TriggerProbationAlerts
+            Call TriggerLWDAlerts
+        Case "Risk Report"
+            ' Call RefreshRiskPanel
+        Case "Offboarded Resources"
+            Call CheckOrphanedAccounts
+        Case "Finance", "Productivity"
+            Call RecalculateDashboard
+    End Select
+    
+    ' Trigger AI context update for RAG re-embedding
+    Call ExportContextForRAG
+End Sub
+
+' --- Standard Module ---
+
+Sub CheckOrphanedAccounts()
+    Dim offWs As Worksheet, jcWs As Worksheet
+    Set offWs = Sheets("Offboarded Resources")
+    Set jcWs = Sheets("SecOps_Authentik")
+    
+    Dim lastRow As Long
+    lastRow = offWs.Cells(offWs.Rows.Count, 1).End(xlUp).Row
+    If lastRow < 2 Then Exit Sub
+    
+    Dim i As Long
+    For i = 2 To lastRow
+        Dim empID As String
+        empID = offWs.Cells(i, 1).Value
+        
+        ' Lookup Authentik status
+        On Error Resume Next
+        Dim jcStatus As String
+        jcStatus = Application.VLookup(empID, jcWs.Range("A:D"), 3, False)
+        
+        If jcStatus = "Active" Then
+            offWs.Cells(i, 12).Value = "🚨 ORPHANED ACCOUNT"
+            offWs.Cells(i, 12).Interior.Color = RGB(255, 80, 80)
+            offWs.Cells(i, 12).Font.Bold = True
+        End If
+    Next i
+End Sub
+
+Sub TriggerProbationAlerts()
+    Dim indWs As Worksheet
+    Set indWs = Sheets("India Employee Database")
+    
+    Dim i As Long
+    For i = 2 To indWs.Cells(indWs.Rows.Count, 1).End(xlUp).Row
+        If indWs.Cells(i, 7).Value = "Under Probation" Then
+            Dim probEnd As Date
+            ' Assuming DOJ is in col 5
+            probEnd = DateAdd("d", 180, indWs.Cells(i, 5).Value)
+            Dim daysLeft As Long
+            daysLeft = DateDiff("d", Date, probEnd)
+            
+            If daysLeft < 0 Then
+                ' Overdue
+                ' MsgBox "CRITICAL: " & indWs.Cells(i, 2).Value & " probation OVERDUE!", vbCritical
+            End If
+        End If
+    Next i
+End Sub
+
+Sub ExportContextForRAG()
+    Dim ctxWs As Worksheet
+    Set ctxWs = Sheets("AI_CONTEXT")
+    ctxWs.Cells.ClearContents
+    
+    Dim row As Long
+    row = 1
+    
+    ctxWs.Cells(row, 1) = "CONTEXT_EXPORT_TIMESTAMP: " & Now()
+    row = row + 1
+    
+    ' Quick summary
+    ctxWs.Cells(row, 1) = "WORKFORCE_SUMMARY: India=" & (Sheets("India Employee Database").Cells(Rows.Count, 1).End(xlUp).Row - 1)
+    row = row + 1
+    
+    ' Trigger external webhook (Optional)
+    ' Call TriggerRAGWebhook
+End Sub
+
+' Dummy procedures for initialization
+Sub RefreshWazuhData(): End Sub
+Sub RefreshWazuhData(): End Sub
+Sub RefreshAuthentikData(): End Sub
+Sub RecalculateDashboard(): End Sub
+Sub TriggerLWDAlerts(): End Sub
