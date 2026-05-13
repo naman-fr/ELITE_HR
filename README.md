@@ -1,6 +1,6 @@
 # 🌿 ELITE HR Intelligence Platform v2.0
 
-![Platform Header](https://raw.githubusercontent.com/naman-fr/ELITE_HR/main/frontend/public/preview.png)
+![Platform Header](frontend/public/preview.png)
 
 > **The Boardroom-Ready HRMIS + AI + SecOps Suite.**  
 > *Consolidate workforce data, predict employee risk, and empower your HR team with a conversational AI co-pilot—all in one premium, high-performance interface.*
