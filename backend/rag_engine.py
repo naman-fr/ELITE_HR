@@ -22,7 +22,7 @@ def serialize_excel(file_path):
     xl = pd.ExcelFile(file_path)
     all_chunks = []
     
-    for sheet in xl.sheetnames:
+    for sheet in xl.sheet_names:
         if sheet in ["India Employee Database", "US Employee Database"]:
             df = xl.parse(sheet)
             for _, row in df.iterrows():
