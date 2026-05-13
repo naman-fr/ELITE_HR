@@ -39,6 +39,17 @@ async def upload_excel(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/stats")
+async def get_stats():
+    try:
+        excel_path = "../ELITE_HR_Master_Dashboard.xlsx"
+        if not os.path.exists(excel_path):
+            return {"error": "Excel file not found"}
+        stats = rag_engine.get_excel_stats(excel_path)
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/chat")
 async def chat(request: QueryRequest):
     try:
