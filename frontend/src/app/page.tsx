@@ -42,7 +42,7 @@ export default function Dashboard() {
           <div style={{ color: 'var(--accent)', fontWeight: 600, background: 'var(--accent-soft)', padding: '0.75rem 1.5rem', borderRadius: '1.5rem' }}>Overview</div>
           <div style={{ opacity: 0.6, padding: '0.75rem 1.5rem' }}>Analytics</div>
           <div style={{ opacity: 0.6, padding: '0.75rem 1.5rem' }}>Wazuh XDR</div>
-          <div style={{ opacity: 0.6, padding: '0.75rem 1.5rem' }}>Authentik IAM</div>
+          <div style={{ opacity: 0.6, padding: '0.75rem 1.5rem' }}>Keycloak IAM</div>
           <div style={{ opacity: 0.6, padding: '0.75rem 1.5rem' }}>Settings</div>
         </nav>
         
@@ -50,7 +50,7 @@ export default function Dashboard() {
           <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Stack Status</div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.7rem', background: '#e8f0e8', color: '#88b088', padding: '0.2rem 0.5rem', borderRadius: '0.5rem' }}>Wazuh OK</span>
-            <span style={{ fontSize: '0.7rem', background: '#e8f0e8', color: '#88b088', padding: '0.2rem 0.5rem', borderRadius: '0.5rem' }}>Authentik OK</span>
+            <span style={{ fontSize: '0.7rem', background: '#e8f0e8', color: '#88b088', padding: '0.2rem 0.5rem', borderRadius: '0.5rem' }}>Keycloak OK</span>
           </div>
         </div>
       </aside>
@@ -100,14 +100,14 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg)', borderRadius: '1.5rem' }}>
                 <div>
                   <div style={{ fontWeight: 600 }}>Orphaned Account: Priya Harris</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Offboarded but Authentik active</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Offboarded but Keycloak active</div>
                 </div>
                 <span className="badge critical">Critical</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg)', borderRadius: '1.5rem' }}>
                 <div>
                   <div style={{ fontWeight: 600 }}>MFA Gap: Kiran Verma</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Authentik policy violation</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Keycloak policy violation</div>
                 </div>
                 <span className="badge warning">Warning</span>
               </div>

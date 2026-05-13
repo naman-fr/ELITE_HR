@@ -7,7 +7,7 @@ Private Sub Workbook_Open()
     Application.StatusBar = "Initialising HR Intelligence Platform..."
     Call RefreshWazuhData
     Call RefreshWazuhData
-    Call RefreshAuthentikData
+    Call RefreshKeycloakData
     Call CheckOrphanedAccounts
     Call RecalculateDashboard
     Call TriggerProbationAlerts
@@ -39,7 +39,7 @@ End Sub
 Sub CheckOrphanedAccounts()
     Dim offWs As Worksheet, jcWs As Worksheet
     Set offWs = Sheets("Offboarded Resources")
-    Set jcWs = Sheets("SecOps_Authentik")
+    Set jcWs = Sheets("SecOps_Keycloak")
     
     Dim lastRow As Long
     lastRow = offWs.Cells(offWs.Rows.Count, 1).End(xlUp).Row
@@ -50,7 +50,7 @@ Sub CheckOrphanedAccounts()
         Dim empID As String
         empID = offWs.Cells(i, 1).Value
         
-        ' Lookup Authentik status
+        ' Lookup Keycloak status
         On Error Resume Next
         Dim jcStatus As String
         jcStatus = Application.VLookup(empID, jcWs.Range("A:D"), 3, False)
@@ -106,6 +106,6 @@ End Sub
 ' Dummy procedures for initialization
 Sub RefreshWazuhData(): End Sub
 Sub RefreshWazuhData(): End Sub
-Sub RefreshAuthentikData(): End Sub
+Sub RefreshKeycloakData(): End Sub
 Sub RecalculateDashboard(): End Sub
 Sub TriggerLWDAlerts(): End Sub

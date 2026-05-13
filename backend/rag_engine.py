@@ -9,6 +9,10 @@ load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Wazuh Cloud Config
+WAZUH_API_KEY = os.getenv("WAZUH_API_KEY")
+WAZUH_URL = os.getenv("WAZUH_API_URL", "https://api.cloud.wazuh.com/v2")
+
 # Local ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="hr_data")
