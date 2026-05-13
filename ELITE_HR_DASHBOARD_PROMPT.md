@@ -12,7 +12,7 @@ It covers three interlocked layers:
 ```
 LAYER 1 ── Excel HR Analytics Dashboard  (data spine)
 LAYER 2 ── OpenAI RAG Engine             (intelligent assistant)
-LAYER 3 ── SecOps Integration            (CrowdStrike · Netskope · JumpCloud)
+LAYER 3 ── SecOps Integration            (Wazuh · Wazuh · Authentik)
 ```
 
 Paste the entire document as the **system prompt** (or first user message) when instructing the AI.  
@@ -58,17 +58,17 @@ Build a production HRMIS that a Fortune 500 CHRO would open in a board meeting.*
 ├────────────────┬────────────────────┬────────────────────────────┤
 │  DATA LAYER    │   AI LAYER         │   SECURITY LAYER           │
 │                │                    │                            │
-│  Excel Workbook│  OpenAI GPT-4o     │  CrowdStrike Falcon API    │
+│  Excel Workbook│  OpenAI GPT-4o     │  Wazuh Falcon API    │
 │  ├ India DB    │  ├ Embeddings       │  ├ Device Compliance       │
 │  ├ US DB       │  ├ Vector Store     │  ├ Endpoint Risk Score     │
 │  ├ Finance     │  ├ Function Calls   │  └ Incident Feed          │
 │  ├ Productivity│  └ Streaming UI     │                            │
-│  ├ Risk Report │                    │  Netskope API              │
+│  ├ Risk Report │                    │  Wazuh API              │
 │  ├ RM Data     │  Context Sources:   │  ├ Cloud App Usage         │
 │  └ Offboarded  │  ├ Excel Sheets     │  ├ DLP Violation Alerts    │
-│                │  ├ CrowdStrike      │  └ UEBA Anomaly Scores    │
-│  Power Query   │  ├ Netskope         │                            │
-│  Named Ranges  │  ├ JumpCloud        │  JumpCloud Directory API  │
+│                │  ├ Wazuh      │  └ UEBA Anomaly Scores    │
+│  Power Query   │  ├ Wazuh         │                            │
+│  Named Ranges  │  ├ Authentik        │  Authentik Directory API  │
 │  VBA Triggers  │  └ HR Policy Docs  │  ├ User Provisioning State  │
 │                │                    │  ├ MFA Compliance           │
 │                │                    │  └ Group Membership         │
@@ -98,9 +98,9 @@ Build a production HRMIS that a Fortune 500 CHRO would open in a board meeting.*
 | **Risk Report** | HR risk register | Visible |
 | **RM Data** | Monthly resource allocation | Visible |
 | **Offboarded Resources** | Exit records for attrition calc | Visible |
-| **SecOps_CrowdStrike** | Endpoint risk feed (API-populated) | Visible |
-| **SecOps_Netskope** | Cloud access/DLP violations | Visible |
-| **SecOps_JumpCloud** | Identity & provisioning state | Visible |
+| **SecOps_Wazuh** | Endpoint risk feed (XDR) | Visible |
+| **SecOps_Wazuh_DLP** | Cloud access/DLP violations | Visible |
+| **SecOps_Authentik** | Identity & provisioning state | Visible |
 | **CALC** | Intermediate pivot calculations | Hidden |
 | **CONFIG** | Thresholds, API keys, lookup tables | Hidden |
 | **AI_CONTEXT** | Serialised context pushed to RAG engine | Hidden |
@@ -123,20 +123,20 @@ ROW 119    ── FOOTER / METADATA
 
 ### 3.3  SecOps Intelligence Panel (Section H)
 
-**CrowdStrike Sub-Panel**
+**Wazuh Sub-Panel**
 
 | Column | Content | Formula/Source |
 |--------|---------|---------------|
 | Employee Name | Linked from India/US DB | INDEX/MATCH on hostname→EmpID |
-| Device Hostname | From SecOps_CrowdStrike tab | Direct ref |
-| OS Version | CrowdStrike feed | Direct ref |
+| Device Hostname | From SecOps_Wazuh tab | Direct ref |
+| OS Version | Wazuh feed | Direct ref |
 | Patch Status | Compliant / Non-Compliant / Critical | Conditional format |
 | Zero-Day Exposure | Yes/No | Red flag if Yes |
 | Last Seen | Timestamp | Date format |
 | Risk Score | 0-100 | Color scale rule |
 | HR Action Required | Formula-generated | IF(risk>70,"🔴 ESCALATE",IF(risk>40,"🟡 REVIEW","✅ OK")) |
 
-**Netskope Sub-Panel**
+**Wazuh Sub-Panel**
 
 | Column | Content |
 |--------|---------|
@@ -144,11 +144,11 @@ ROW 119    ── FOOTER / METADATA
 | Top Cloud App | Most-used (Shadow IT risk) |
 | DLP Violation Count | Last 30 days |
 | Sensitive Data Upload | Volume (MB) |
-| Anomaly Score | UEBA score from Netskope |
+| Anomaly Score | UEBA score from Wazuh |
 | Policy Breach Flag | TRUE/FALSE → Red if TRUE |
 | HR Recommended Action | Dynamic |
 
-**JumpCloud Sub-Panel**
+**Authentik Sub-Panel**
 
 | Column | Content |
 |--------|---------|
@@ -164,10 +164,10 @@ ROW 119    ── FOOTER / METADATA
 ```excel
 =IF(AND(
   VLOOKUP(A{r}, 'Offboarded Resources'!A:G, 7, 0) <> "",
-  VLOOKUP(A{r}, SecOps_JumpCloud!A:H, 3, 0) = "Active"
+  VLOOKUP(A{r}, SecOps_Authentik!A:H, 3, 0) = "Active"
 ), "🚨 ORPHANED ACCOUNT", "")
 ```
-*Flags any offboarded employee whose JumpCloud account is still active.*
+*Flags any offboarded employee whose Authentik account is still active.*
 
 ---
 
@@ -194,9 +194,9 @@ HR Manager types question
  │  2. CONTEXT RETRIEVER                               │
  │     ├─ Vector search over embedded HR data          │
  │     ├─ Live Excel sheet reader (Office.js / API)    │
- │     ├─ CrowdStrike API call (if SecOps intent)      │
- │     ├─ Netskope API call (if DLP/access intent)     │
- │     └─ JumpCloud API call (if identity intent)      │
+ │     ├─ Wazuh API call (if SecOps intent)      │
+ │     ├─ Wazuh API call (if DLP/access intent)     │
+ │     └─ Authentik API call (if identity intent)      │
  │                                                     │
  │  3. PROMPT ASSEMBLER                                │
  │     └─ System prompt + retrieved context + query   │
@@ -230,7 +230,7 @@ Skillset: {skillset}
 Finance: Annual CTC INR={ctc_inr}, USD={ctc_usd}
 Productivity: Avg Hrs/Day={avg_hrs}, Flag={below_8hr_flag}
 Risk: Level={risk_level}, Category={risk_category}, Status={risk_status}
-SecOps: CrowdStrike Risk={cs_score}, MFA={mfa_status}, JC Account={jc_status}
+SecOps: Wazuh Risk={cs_score}, MFA={mfa_status}, JC Account={jc_status}
 """
 ```
 
@@ -266,9 +266,9 @@ You have access to real-time data from:
   • Finance & CTC records
   • Productivity metrics
   • Risk register
-  • CrowdStrike endpoint security feed
-  • Netskope cloud access & DLP logs
-  • JumpCloud identity directory
+  • Wazuh endpoint security feed
+  • Wazuh cloud access & DLP logs
+  • Authentik identity directory
 
 YOUR CAPABILITIES:
 1. Answer natural-language HR queries with data citations
@@ -279,7 +279,7 @@ YOUR CAPABILITIES:
 6. Predict flight risk based on productivity + security anomaly correlation
 
 RESPONSE FORMAT RULES:
-- Always cite the source: [India DB], [CrowdStrike], [Netskope], etc.
+- Always cite the source: [India DB], [Wazuh], [Wazuh], etc.
 - Always express numbers with units: "8.7 hrs/day", "₹2.1M annual CTC"
 - For risk flags, always recommend a specific HR action
 - For SecOps alerts, escalate severity: INFO → WARNING → CRITICAL
@@ -309,7 +309,7 @@ Define these functions so GPT-4o can call live data on demand:
       "type": "object",
       "properties": {
         "employee_id": {"type": "string", "description": "Employee ID like IN1045 or US2019"},
-        "include_secops": {"type": "boolean", "description": "Include CrowdStrike/Netskope/JumpCloud data"}
+        "include_secops": {"type": "boolean", "description": "Include Wazuh/Wazuh/Authentik data"}
       },
       "required": ["employee_id"]
     }
@@ -339,8 +339,8 @@ Define these functions so GPT-4o can call live data on demand:
     }
   },
   {
-    "name": "get_crowdstrike_alerts",
-    "description": "Fetch recent CrowdStrike endpoint alerts for an employee",
+    "name": "get_Wazuh_alerts",
+    "description": "Fetch recent Wazuh endpoint alerts for an employee",
     "parameters": {
       "type": "object",
       "properties": {
@@ -352,8 +352,8 @@ Define these functions so GPT-4o can call live data on demand:
     }
   },
   {
-    "name": "get_netskope_violations",
-    "description": "Retrieve Netskope DLP violations and shadow IT usage for an employee",
+    "name": "get_Wazuh_violations",
+    "description": "Retrieve Wazuh DLP violations and shadow IT usage for an employee",
     "parameters": {
       "type": "object",
       "properties": {
@@ -364,8 +364,8 @@ Define these functions so GPT-4o can call live data on demand:
     }
   },
   {
-    "name": "get_jumpcloud_identity",
-    "description": "Get JumpCloud directory status, MFA, groups, and last login for an employee",
+    "name": "get_Authentik_identity",
+    "description": "Get Authentik directory status, MFA, groups, and last login for an employee",
     "parameters": {
       "type": "object",
       "properties": {
@@ -419,13 +419,13 @@ AI: [Calls get_department_summary(department="Engineering")]
 ```
 HR: "Is Aditya Taylor a flight risk?"
 AI: [Calls get_employee_profile(IN1040, include_secops=True)]
-    [Calls get_crowdstrike_alerts(IN1040)]
-    [Calls get_netskope_violations(IN1040)]
+    [Calls get_Wazuh_alerts(IN1040)]
+    [Calls get_Wazuh_violations(IN1040)]
     → Returns: "FLIGHT RISK ASSESSMENT — Aditya Taylor [IN1040]
       ⚠ HR Risk: 'Skill Gap' flagged in Risk Register [Risk Report tab]
       ⚠ Productivity: 7.19 hrs/day avg — below benchmark [Productivity tab]
-      ⚠ Netskope: 3 LinkedIn access events in last 7 days [Netskope]
-      ⚠ CrowdStrike: USB device inserted 2× in last 30 days [CrowdStrike]
+      ⚠ Wazuh: 3 LinkedIn access events in last 7 days [Wazuh]
+      ⚠ Wazuh: USB device inserted 2× in last 30 days [Wazuh]
       COMBINED RISK SCORE: 78/100 — HIGH
       Recommended: Immediate retention conversation + skip-level meeting"
 ```
@@ -433,17 +433,17 @@ AI: [Calls get_employee_profile(IN1040, include_secops=True)]
 **Test 3 — Identity/Access troubleshooting**
 ```
 HR: "We offboarded Priya Harris in Q3. Is her access fully revoked?"
-AI: [Calls get_jumpcloud_identity(US2013, check_orphan=True)]
-    [Calls get_crowdstrike_alerts(US2013, days_back=90)]
+AI: [Calls get_Authentik_identity(US2013, check_orphan=True)]
+    [Calls get_Wazuh_alerts(US2013, days_back=90)]
     → Returns: "🚨 ORPHANED ACCESS DETECTED — Priya Harris [US2013]
       Last Working Day: [from Offboarded tab]
-      JumpCloud Account: STILL ACTIVE as of today
-      Last Login: [date from JumpCloud]
-      CrowdStrike: Device still reporting telemetry
+      Authentik Account: STILL ACTIVE as of today
+      Last Login: [date from Authentik]
+      Wazuh: Device still reporting telemetry
       Required Actions:
-        1. Suspend JumpCloud account immediately → [Generate ticket]
+        1. Suspend Authentik account immediately → [Generate ticket]
         2. Revoke all SSO app access
-        3. Retrieve company device (IMEI: [from CrowdStrike])
+        3. Retrieve company device (IMEI: [from Wazuh])
         4. Escalate to IT Security within 2 hours"
 ```
 
@@ -460,11 +460,11 @@ AI: [Calls get_department_summary(department="Engineering", region="Both")]
       Source: [Finance tab, India DB, US DB]"
 ```
 
-**Test 5 — CrowdStrike troubleshooting query**
+**Test 5 — Wazuh troubleshooting query**
 ```
 HR: "Kiran Verma says her laptop keeps getting quarantined. What's happening?"
-AI: [Calls get_crowdstrike_alerts(IN1005, severity="all", days_back=14)]
-    → Returns: "CrowdStrike Endpoint Report — Kiran Verma [IN1005]
+AI: [Calls get_Wazuh_alerts(IN1005, severity="all", days_back=14)]
+    → Returns: "Wazuh Endpoint Report — Kiran Verma [IN1005]
       Device: LAPTOP-IN1005 (Windows 11 22H2)
       Quarantine Events (last 14 days): 3 occurrences
       Root Cause: Detection rule 'SUSPICIOUS_POWERSHELL_ENCODED_CMD'
@@ -473,18 +473,18 @@ AI: [Calls get_crowdstrike_alerts(IN1005, severity="all", days_back=14)]
       Recommended IT Action:
         1. Add exclusion for C:\Users\kiran\AppData\Roaming\Code\extensions\
         2. Whitelist process: 'Code.exe' → PowerShell child process
-        3. Submit false-positive report to CrowdStrike portal
+        3. Submit false-positive report to Wazuh portal
         4. No malicious activity found — safe to unquarantine"
 ```
 
-**Test 6 — Netskope DLP troubleshooting**
+**Test 6 — Wazuh DLP troubleshooting**
 ```
-HR: "Netskope flagged Varun Anderson for data exfiltration. Is this accurate?"
-AI: [Calls get_netskope_violations(IN1053, event_type="dlp")]
+HR: "Wazuh flagged Varun Anderson for data exfiltration. Is this accurate?"
+AI: [Calls get_Wazuh_violations(IN1053, event_type="dlp")]
     [Calls get_employee_profile(IN1053)]
     → Returns: "DLP Investigation — Varun Anderson [IN1053]
       Status: HR Business Partner | Dept: HR | Region: India
-      Netskope Events (last 30 days):
+      Wazuh Events (last 30 days):
         • 12× large file uploads to personal Google Drive
         • Files: HR_Database_Export_*.xlsx (avg 8MB each)
         • Destination: personal@gmail.com (non-corporate)
@@ -492,25 +492,25 @@ AI: [Calls get_netskope_violations(IN1053, event_type="dlp")]
       Context: Employee is in notice period [see Offboarded tab]
       Urgency: HIGH
       Recommended Actions:
-        1. Block Google Drive upload via Netskope policy immediately
+        1. Block Google Drive upload via Wazuh policy immediately
         2. Initiate HR investigation — document all events
-        3. Legal hold on device data via CrowdStrike
+        3. Legal hold on device data via Wazuh
         4. IT to verify files do not contain PII from employee DB
         5. Draft warning letter? → [Yes, generate document]"
 ```
 
-**Test 7 — JumpCloud provisioning query**
+**Test 7 — Authentik provisioning query**
 ```
 HR: "We just hired Deepa Pillai on probation. Is her IT access set up correctly?"
-AI: [Calls get_jumpcloud_identity(IN1045)]
+AI: [Calls get_Authentik_identity(IN1045)]
     → Returns: "Onboarding Check — Deepa Pillai [IN1045]
-      JumpCloud Status: ACTIVE ✅
+      Authentik Status: ACTIVE ✅
       MFA: NOT ENROLLED ⚠
       Groups Assigned: finance-team, all-india
       Missing Groups: finance-sensitive-data (required for Sr. Analyst role)
       Last Login: [date]
-      Device Enrolled in CrowdStrike: YES ✅
-      Netskope Policy Applied: YES ✅
+      Device Enrolled in Wazuh: YES ✅
+      Wazuh Policy Applied: YES ✅
       Action Items:
         1. Force MFA enrolment within 24 hours (policy SLA)
         2. Add to group: finance-sensitive-data
@@ -521,15 +521,15 @@ AI: [Calls get_jumpcloud_identity(IN1045)]
 
 ## PART V — SECOPS INTEGRATION SPECIFICATIONS
 
-### 5.1  CrowdStrike Falcon API
+### 5.1  Wazuh Falcon API
 
 **Authentication:**
 ```python
 import requests
 
-CS_BASE = "https://api.crowdstrike.com"
-CS_CLIENT_ID = config["crowdstrike_client_id"]
-CS_SECRET = config["crowdstrike_client_secret"]
+CS_BASE = "https://api.Wazuh.com"
+CS_CLIENT_ID = config["Wazuh_client_id"]
+CS_SECRET = config["Wazuh_client_secret"]
 
 def get_cs_token():
     r = requests.post(f"{CS_BASE}/oauth2/token",
@@ -558,9 +558,9 @@ GET /fwmgr/queries/events/v1?filter=event_type:'DeviceControl'
 
 **Excel Sync (VBA Macro):**
 ```vba
-Sub RefreshCrowdStrikeData()
+Sub RefreshWazuhData()
     Dim ws As Worksheet
-    Set ws = Sheets("SecOps_CrowdStrike")
+    Set ws = Sheets("SecOps_Wazuh")
     
     ' Call Python bridge script or XMLHTTP to fetch API data
     ' Populate rows: EmpID | Hostname | OS | PatchStatus | RiskScore | LastSeen | Alerts
@@ -573,14 +573,14 @@ Sub RefreshCrowdStrikeData()
 End Sub
 ```
 
-### 5.2  Netskope API
+### 5.2  Wazuh API
 
 **Authentication:**
 ```python
 NS_BASE = "https://{tenant}.goskope.com/api/v2"
-NS_TOKEN = config["netskope_api_token"]
+NS_TOKEN = config["Wazuh_api_token"]
 
-headers = {"Netskope-Api-Token": NS_TOKEN}
+headers = {"Wazuh-Api-Token": NS_TOKEN}
 ```
 
 **Key Endpoints:**
@@ -604,16 +604,16 @@ GET /transaction_events?query=user:{email}&transaction_type=blocked
 
 **Excel Mapping Logic:**
 ```
-Netskope user email → Lookup Employee ID via India/US DB email column
-→ Populate SecOps_Netskope: EmpID | Email | DLP_Count | TopApp | AnomalyScore | PolicyBreach
+Wazuh user email → Lookup Employee ID via India/US DB email column
+→ Populate SecOps_Wazuh: EmpID | Email | DLP_Count | TopApp | AnomalyScore | PolicyBreach
 ```
 
-### 5.3  JumpCloud API
+### 5.3  Authentik API
 
 **Authentication:**
 ```python
-JC_BASE = "https://console.jumpcloud.com/api"
-JC_KEY = config["jumpcloud_api_key"]
+JC_BASE = "https://console.Authentik.com/api"
+JC_KEY = config["Authentik_api_key"]
 
 headers = {
     "x-api-key": JC_KEY,
@@ -645,7 +645,7 @@ PUT /v1/systemusers/{user_id}
 Body: {"suspended": true}
 
 # 7. Get recent events / audit log
-GET /v1/events?searchTermFilter=system&service=jumpcloud_sso&startDate={date}
+GET /v1/events?searchTermFilter=system&service=Authentik_sso&startDate={date}
 ```
 
 **Orphan Account Sweep (Excel formula + VBA hybrid):**
@@ -653,7 +653,7 @@ GET /v1/events?searchTermFilter=system&service=jumpcloud_sso&startDate={date}
 Sub CheckOrphanedAccounts()
     Dim offWs As Worksheet, jcWs As Worksheet
     Set offWs = Sheets("Offboarded Resources")
-    Set jcWs = Sheets("SecOps_JumpCloud")
+    Set jcWs = Sheets("SecOps_Authentik")
     
     Dim lastRow As Long
     lastRow = offWs.Cells(offWs.Rows.Count, 1).End(xlUp).Row
@@ -663,7 +663,7 @@ Sub CheckOrphanedAccounts()
         Dim empID As String
         empID = offWs.Cells(i, 1).Value
         
-        ' Lookup JumpCloud status
+        ' Lookup Authentik status
         Dim jcStatus As String
         jcStatus = Application.VLookup(empID, jcWs.Range("A:D"), 3, False)
         
@@ -686,9 +686,9 @@ End Sub
 ' ─── Workbook Open: Full Data Refresh ───────────────────────────────────
 Private Sub Workbook_Open()
     Application.StatusBar = "Initialising HR Intelligence Platform..."
-    Call RefreshCrowdStrikeData
-    Call RefreshNetskopeData
-    Call RefreshJumpCloudData
+    Call RefreshWazuhData
+    Call RefreshWazuhData
+    Call RefreshAuthentikData
     Call CheckOrphanedAccounts
     Call RecalculateDashboard
     Call TriggerProbationAlerts
@@ -878,25 +878,25 @@ End Sub
 
 ' ── SECOPS ─────────────────────────────────────────────────────────────────
 
-' Orphaned account flag (offboarded but still active in JumpCloud)
+' Orphaned account flag (offboarded but still active in Authentik)
 =IF(AND(
   NOT(ISNA(MATCH(B2,'Offboarded Resources'!A:A,0))),
-  VLOOKUP(B2,SecOps_JumpCloud!A:D,3,FALSE)="Active"
+  VLOOKUP(B2,SecOps_Authentik!A:D,3,FALSE)="Active"
 ),"🚨 ORPHANED ACCOUNT","")
 
 ' Combined flight risk score (HR + SecOps signals)
 =IFERROR(
   (IF(COUNTIF('Risk Report'!A:A,A2)>0,25,0)) +
   (IF(VLOOKUP(A2,Productivity!A:O,15,0)<7.5,20,0)) +
-  (IF(VLOOKUP(A2,SecOps_CrowdStrike!A:H,7,0)>70,25,0)) +
-  (IF(VLOOKUP(A2,SecOps_Netskope!A:G,4,0)>2,30,0)),
+  (IF(VLOOKUP(A2,SecOps_Wazuh!A:H,7,0)>70,25,0)) +
+  (IF(VLOOKUP(A2,SecOps_Wazuh!A:G,4,0)>2,30,0)),
 0)
 
 ' MFA gap count
-=COUNTIF(SecOps_JumpCloud!E:E,"No")
+=COUNTIF(SecOps_Authentik!E:E,"No")
 
-' High-risk device count (CrowdStrike risk score >70)
-=COUNTIF(SecOps_CrowdStrike!G:G,">70")
+' High-risk device count (Wazuh risk score >70)
+=COUNTIF(SecOps_Wazuh!G:G,">70")
 ```
 
 ---
@@ -911,12 +911,12 @@ The AI uses a weighted multi-signal model:
 |--------|--------|--------|------------------|
 | HR Risk Register flag | 25pts | Risk Report tab | Any active risk entry |
 | Productivity below benchmark | 20pts | Productivity tab | Avg < 7.5 hrs/day |
-| LinkedIn/job site access | 30pts | Netskope | >3 accesses in 7 days |
-| USB device events | 20pts | CrowdStrike | >2 inserts in 30 days |
+| LinkedIn/job site access | 30pts | Wazuh | >3 accesses in 7 days |
+| USB device events | 20pts | Wazuh | >2 inserts in 30 days |
 | Probation overdue | 15pts | HR calc | Past probation end date |
 | Manager complaint filed | 25pts | Risk Report | Risk category = Interpersonal |
 | Salary below peer avg | 20pts | Finance | >20% below dept median |
-| Access anomaly score | 15pts | Netskope UEBA | Score > 60 |
+| Access anomaly score | 15pts | Wazuh UEBA | Score > 60 |
 
 **Score Interpretation:**
 - 0–29: 🟢 LOW RISK
@@ -931,8 +931,8 @@ The AI uses a weighted multi-signal model:
   MIN(100,
     IF(COUNTIF('Risk Report'!A:A,[@[Employee ID]])>0, 25, 0) +
     IF(IFERROR(VLOOKUP([@[Employee ID]],Productivity!A:O,15,0),8) < 7.5, 20, 0) +
-    IF(IFERROR(VLOOKUP([@[Employee ID]],SecOps_CrowdStrike!A:H,7,0),0) > 70, 25, 0) +
-    IF(IFERROR(VLOOKUP([@[Employee ID]],SecOps_Netskope!A:G,4,0),0) > 2, 30, 0) +
+    IF(IFERROR(VLOOKUP([@[Employee ID]],SecOps_Wazuh!A:H,7,0),0) > 70, 25, 0) +
+    IF(IFERROR(VLOOKUP([@[Employee ID]],SecOps_Wazuh!A:G,4,0),0) > 2, 30, 0) +
     IF(IFERROR(VLOOKUP([@[Employee ID]],'Offboarded Resources'!A:A,1,0),"") <> "", 50, 0)
   ),
 0)
@@ -955,11 +955,11 @@ const HRAssistant = () => {
     "🔍 Who are our highest flight risks this quarter?",
     "🔴 Show all orphaned accounts from recent offboarding",
     "📊 Generate Engineering department payroll summary",
-    "⚠️  Which employees have critical CrowdStrike alerts?",
+    "⚠️  Which employees have critical Wazuh alerts?",
     "📋 Draft a PIP for [employee name]",
     "🔐 Who hasn't enrolled in MFA yet?",
     "📉 What's driving Q3 attrition spike?",
-    "🛡️  Show Netskope DLP violations this month",
+    "🛡️  Show Wazuh DLP violations this month",
   ];
   
   return (
@@ -969,7 +969,7 @@ const HRAssistant = () => {
       <MessageThread messages={messages} />
       <QuickPrompts prompts={QUICK_PROMPTS} onSelect={sendMessage} />
       <InputBar onSend={sendMessage} />
-      <DataSourceBadges />                   {/* Shows: Excel ✅ | CrowdStrike ✅ | Netskope ✅ | JumpCloud ✅ */}
+      <DataSourceBadges />                   {/* Shows: Excel ✅ | Wazuh ✅ | Wazuh ✅ | Authentik ✅ */}
     </div>
   );
 };
@@ -998,9 +998,9 @@ The AI response renderer must handle:
 
 ```
 [ ] All Excel formulas return 0 errors (run scripts/recalc.py)
-[ ] CrowdStrike API OAuth2 token valid and tested
-[ ] Netskope API token scoped to read-only (HR use)
-[ ] JumpCloud API key scoped: Users (read) + Groups (read) + Suspend (write HR only)
+[ ] Wazuh API OAuth2 token valid and tested
+[ ] Wazuh API token scoped to read-only (HR use)
+[ ] Authentik API key scoped: Users (read) + Groups (read) + Suspend (write HR only)
 [ ] OpenAI API key set with spend limit
 [ ] Vector store populated with all employee records
 [ ] Function calling tested for all 8 tool schemas
@@ -1010,7 +1010,7 @@ The AI response renderer must handle:
 [ ] RBAC: HR Managers see all | HR Business Partners see own dept | Employees see self only
 [ ] VBA macros signed with code certificate
 [ ] Workbook protected: Dashboard tab locked, source tabs editable by HR only
-[ ] API refresh scheduled: CrowdStrike/Netskope/JumpCloud every 6 hours (cron job)
+[ ] API refresh scheduled: Wazuh/Wazuh/Authentik every 6 hours (cron job)
 [ ] Alert emails configured: probation/LWD/orphan → hr-alerts@company.com
 [ ] Mobile-responsive chat UI tested on iOS/Android
 [ ] Offline mode: Dashboard works without API if SecOps tabs pre-populated
@@ -1036,7 +1036,7 @@ The AI response renderer must handle:
 1. Set up Excel workbook with all tabs
 2. Populate India/US DB from HR system export
 3. Build Finance, Productivity, Risk, RM tabs
-4. Add SecOps_CrowdStrike / _Netskope / _JumpCloud tabs (empty)
+4. Add SecOps_Wazuh / _Wazuh / _Authentik tabs (empty)
 5. Create CALC and CONFIG hidden sheets
 ```
 
@@ -1054,9 +1054,9 @@ The AI response renderer must handle:
 
 ### Phase 3 — SecOps Integration (Days 6-8)
 ```
-14. Write CrowdStrike API connector (Python or VBA)
-15. Write Netskope API connector
-16. Write JumpCloud API connector
+14. Write Wazuh API connector (Python or VBA)
+15. Write Wazuh API connector
+16. Write Authentik API connector
 17. Map API responses to SecOps tabs
 18. Build SecOps Intelligence Panel on Dashboard
 19. Add orphaned account detection formula + VBA
@@ -1091,22 +1091,22 @@ The AI response renderer must handle:
 
 ```json
 {
-  "crowdstrike": {
-    "client_id": "ENV:CROWDSTRIKE_CLIENT_ID",
-    "client_secret": "ENV:CROWDSTRIKE_SECRET",
-    "base_url": "https://api.crowdstrike.com",
+  "Wazuh": {
+    "client_id": "ENV:Wazuh_CLIENT_ID",
+    "client_secret": "ENV:Wazuh_SECRET",
+    "base_url": "https://api.Wazuh.com",
     "refresh_interval_hours": 6
   },
-  "netskope": {
-    "api_token": "ENV:NETSKOPE_TOKEN",
-    "tenant": "ENV:NETSKOPE_TENANT",
+  "Wazuh": {
+    "api_token": "ENV:Wazuh_TOKEN",
+    "tenant": "ENV:Wazuh_TENANT",
     "base_url": "https://{tenant}.goskope.com/api/v2",
     "dlp_lookback_days": 30,
     "anomaly_threshold": 60
   },
-  "jumpcloud": {
-    "api_key": "ENV:JUMPCLOUD_API_KEY",
-    "base_url": "https://console.jumpcloud.com/api",
+  "Authentik": {
+    "api_key": "ENV:Authentik_API_KEY",
+    "base_url": "https://console.Authentik.com/api",
     "mfa_required": true,
     "orphan_check_on_offboard": true
   },
@@ -1142,9 +1142,9 @@ The AI response renderer must handle:
 
 | Term | Definition |
 |------|-----------|
-| **CrowdStrike Falcon** | EDR/XDR platform — monitors endpoint behaviour, quarantines threats, tracks device compliance |
-| **Netskope** | SASE/CASB platform — monitors cloud app usage, enforces DLP policies, generates UEBA scores |
-| **JumpCloud** | Cloud directory — manages user identities, SSO, MFA, device binding, group policies |
+| **Wazuh Falcon** | EDR/XDR platform — monitors endpoint behaviour, quarantines threats, tracks device compliance |
+| **Wazuh** | SASE/CASB platform — monitors cloud app usage, enforces DLP policies, generates UEBA scores |
+| **Authentik** | Cloud directory — manages user identities, SSO, MFA, device binding, group policies |
 | **RAG** | Retrieval-Augmented Generation — AI answers grounded in retrieved documents, not just training data |
 | **UEBA** | User and Entity Behaviour Analytics — detects anomalies in user access patterns |
 | **CASB** | Cloud Access Security Broker — enforces security policies for cloud app usage |
@@ -1152,9 +1152,9 @@ The AI response renderer must handle:
 | **Orphaned Account** | A user account still active in identity systems after an employee has left |
 | **Flight Risk** | Employee with elevated probability of voluntary resignation, based on multi-signal scoring |
 | **PIP** | Performance Improvement Plan — formal HR document for underperforming employees |
-| **SSO** | Single Sign-On — one login for all enterprise applications, managed via JumpCloud |
-| **EDR** | Endpoint Detection & Response — CrowdStrike's core capability |
-| **SASE** | Secure Access Service Edge — Netskope's architecture combining network + security |
+| **SSO** | Single Sign-On — one login for all enterprise applications, managed via Authentik |
+| **EDR** | Endpoint Detection & Response — Wazuh's core capability |
+| **SASE** | Secure Access Service Edge — Wazuh's architecture combining network + security |
 
 ---
 
