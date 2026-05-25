@@ -1,3 +1,13 @@
+---
+title: HR Board
+emoji: 🌿
+colorFrom: green
+colorTo: sage
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🌿 ELITE HR Intelligence Platform v2.0
 
 ![Platform Header](frontend/public/preview.png)
