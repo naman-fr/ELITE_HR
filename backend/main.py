@@ -72,7 +72,13 @@ async def chat(request: QueryRequest):
         response = rag_engine.handle_query(request.query, hist_dicts)
         return {"response": response}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Chat error: {e}")
+        err_str = str(e).lower()
+        if "api_key" in err_str or "api key" in err_str or "auth" in err_str or "connection" in err_str or "rate limit" in err_str:
+            friendly_msg = "Oh no! I lost connection to the AI co-pilot. Please make sure that your OpenAI or Groq API key is correctly configured in your Hugging Face Space secrets or environment variables. 🌿"
+        else:
+            friendly_msg = f"I encountered an error trying to process your request: {str(e)}. Please check your backend configurations. 🌿"
+        return {"response": friendly_msg}
 
 @app.post("/ingest")
 async def ingest():

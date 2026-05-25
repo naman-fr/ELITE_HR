@@ -528,16 +528,17 @@ def calculate_compliance_metrics(xl):
         # Assuming 'Employee ID' is first col in both
         orphans = 0
         if "Employee ID" in df_off.columns and "Employee ID" in df_jc.columns:
-            off_ids = df_off["Employee ID"].unique()
-            active_jc = df_jc[df_jc["Account Status"] == "Active"]["Employee ID"].unique()
+            off_ids = [str(x).split('.')[0].strip().lower() for x in df_off["Employee ID"].dropna().unique()]
+            active_jc = [str(x).split('.')[0].strip().lower() for x in df_jc[df_jc["Account Status"].astype(str).str.strip().str.lower() == "active"]["Employee ID"].dropna().unique()]
             orphans = len(set(off_ids).intersection(set(active_jc)))
             
         mfa_gap = 0
         if "MFA Enrolled" in df_jc.columns:
-            mfa_gap = len(df_jc[df_jc["MFA Enrolled"] == "No"])
+            mfa_gap = len(df_jc[df_jc["MFA Enrolled"].astype(str).str.strip().str.lower() == "no"])
             
         return orphans, mfa_gap
-    except:
+    except Exception as e:
+        print("Error calculating compliance metrics:", e)
         return 0, 0
 
 def get_excel_stats(file_path):
@@ -552,6 +553,11 @@ def get_excel_stats(file_path):
     prod_col = "Overall Avg Hrs/Day" if "Overall Avg Hrs/Day" in df_prod.columns else "Avg Hrs/Day"
     avg_prod = df_prod[prod_col].mean() if prod_col in df_prod.columns else 8.0
     
+    # Handle NaN in productivity
+    import math
+    if pd.isna(avg_prod) or math.isnan(avg_prod) or math.isinf(avg_prod):
+        avg_prod = 8.0
+        
     # Compliance metrics
     orphans, mfa_gap = calculate_compliance_metrics(xl)
     
@@ -562,6 +568,7 @@ def get_excel_stats(file_path):
         "headcount": total_headcount,
         "avg_productivity": round(float(avg_prod), 1),
         "compliance_risks": orphans + mfa_gap,
-        "identity_health": 100 - mfa_gap if total_headcount > 0 else 100,
-        "departments": [{"label": k, "val": int(v)} for k, v in dept_counts.items()]
+        "identity_health": int(100 - mfa_gap if total_headcount > 0 else 100),
+        "departments": [{"label": str(k), "val": int(v)} for k, v in dept_counts.items() if pd.notna(k)]
     }
+
