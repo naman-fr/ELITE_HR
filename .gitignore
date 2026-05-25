@@ -9,3 +9,9 @@ build/
 .DS_Store
 *.xlsx
 *.xlsm
+backend/static/
+backend/chroma_db/
+backend/__pycache__/
+frontend/.next/
+frontend/node_modules/
+frontend/out/

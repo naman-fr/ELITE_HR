@@ -25,7 +25,7 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('http://localhost:8000/stats');
+      const res = await fetch('/stats');
       const data = await res.json();
       if (!data.error) {
         setStats(data);
@@ -48,7 +48,7 @@ export default function Dashboard() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8000/upload', {
+      const res = await fetch('/upload', {
         method: 'POST',
         body: formData,
       });
@@ -70,15 +70,20 @@ export default function Dashboard() {
     if (!query.trim()) return;
     
     const userMsg = { role: 'user', content: query };
+    const historyToSend = messages.map(msg => ({
+      role: msg.role === 'ai' ? 'assistant' : msg.role,
+      content: msg.content
+    }));
+
     setMessages(prev => [...prev, userMsg]);
     setQuery('');
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:8000/chat', {
+      const res = await fetch('/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, history: historyToSend }),
       });
       const data = await res.json();
       setMessages(prev => [...prev, { role: 'ai', content: data.response }]);

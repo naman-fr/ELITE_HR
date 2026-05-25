@@ -16,10 +16,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class QueryRequest(BaseModel):
     query: str
+    history: list[ChatMessage] = []
 
-@app.get("/")
+@app.get("/health")
 def read_root():
     return {"status": "ELITE HR API is online"}
 
@@ -51,7 +56,9 @@ async def get_stats():
     try:
         excel_path = "../ELITE_HR_Master_Dashboard.xlsx"
         if not os.path.exists(excel_path):
-            return {"error": "Excel file not found"}
+            excel_path = "ELITE_HR_Master_Dashboard.xlsx"
+            if not os.path.exists(excel_path):
+                return {"error": "Excel file not found"}
         stats = rag_engine.get_excel_stats(excel_path)
         return stats
     except Exception as e:
@@ -60,7 +67,9 @@ async def get_stats():
 @app.post("/chat")
 async def chat(request: QueryRequest):
     try:
-        response = rag_engine.handle_query(request.query)
+        # Convert request history objects to list of dicts for handle_query
+        hist_dicts = [{"role": msg.role, "content": msg.content} for msg in request.history]
+        response = rag_engine.handle_query(request.query, hist_dicts)
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -70,11 +79,20 @@ async def ingest():
     try:
         excel_path = "../ELITE_HR_Master_Dashboard.xlsx"
         if not os.path.exists(excel_path):
-            return {"error": "Excel file not found"}
+            excel_path = "ELITE_HR_Master_Dashboard.xlsx"
+            if not os.path.exists(excel_path):
+                return {"error": "Excel file not found"}
         rag_engine.ingest_data(excel_path)
         return {"status": "Data ingested successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+from fastapi.staticfiles import StaticFiles
+
+# Serve frontend static assets if available
+static_path = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_path):
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
