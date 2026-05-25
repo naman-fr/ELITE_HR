@@ -14,6 +14,7 @@ API_KEY = os.getenv("OPENAI_API_KEY")
 BASE_URL = "https://api.groq.com/openai/v1" if str(API_KEY).startswith("gsk_") else None
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+DEFAULT_MODEL = "llama-3.3-70b-versatile" if BASE_URL else "gpt-4o"
 
 # Wazuh Cloud Config
 WAZUH_API_KEY = os.getenv("WAZUH_API_KEY")
@@ -123,7 +124,7 @@ Output a valid JSON block ONLY, matching this schema:
         {"role": "system", "content": system_prompt}
     ] + formatted_history
     
-    model = "llama-3.1-70b-versatile" if BASE_URL else "gpt-4o"
+    model = DEFAULT_MODEL
     
     try:
         try:
@@ -227,7 +228,7 @@ Rules:
 - Maintain a highly professional, boardroom-ready tone.
 """
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[{"role": "system", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -248,7 +249,7 @@ Rules:
 - Maintain a highly professional, security-aware tone.
 """
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[{"role": "system", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -265,7 +266,7 @@ Rules:
 - Keep it professional and short.
 """
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[{"role": "system", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -290,7 +291,7 @@ Rules:
 - Maintain a boardroom-ready, professional tone.
 """
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[{"role": "system", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -313,7 +314,7 @@ Rules:
 - Keep it concise and professional.
 """
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[{"role": "system", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -344,7 +345,7 @@ Rules:
 - Comment on whether they meet standard workload requirements (typical standard is 8.0 hrs/day).
 """
         response = client.chat.completions.create(
-            model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+            model=DEFAULT_MODEL,
             messages=[{"role": "system", "content": prompt}]
         )
         return response.choices[0].message.content
@@ -376,7 +377,7 @@ Rules:
 - Maintain a boardroom-ready tone.
 """
         response = client.chat.completions.create(
-            model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+            model=DEFAULT_MODEL,
             messages=[{"role": "system", "content": prompt}]
         )
         return response.choices[0].message.content
@@ -393,7 +394,7 @@ Rules:
 - Provide a summary and average daily hours organization-wide.
 """
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[{"role": "system", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -416,7 +417,7 @@ Rules:
 - Keep it professional and action-oriented.
 """
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile" if BASE_URL else "gpt-4o",
+        model=DEFAULT_MODEL,
         messages=[{"role": "system", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -449,7 +450,7 @@ RESPONSE FORMAT RULES:
         {"role": "user", "content": f"RAG Context: {' '.join(context)}\n\nQuery: {query}"}
     ]
     
-    model = "llama-3.1-70b-versatile" if BASE_URL else "gpt-4o"
+    model = DEFAULT_MODEL
     response = client.chat.completions.create(
         model=model,
         messages=messages
@@ -519,27 +520,115 @@ def handle_query(query, history=None):
         context = query_rag(query)
         return generate_general_response(query, context, history)
 
+def get_keycloak_data():
+    """
+    Attempts to connect to Keycloak and retrieve real user statistics.
+    Returns (connected: bool, users: list, error: str)
+    """
+    import requests
+    keycloak_url = os.getenv("KEYCLOAK_URL")
+    realm = os.getenv("KEYCLOAK_REALM", "master")
+    client_id = os.getenv("KEYCLOAK_CLIENT_ID", "hr-platform")
+    client_secret = os.getenv("KEYCLOAK_CLIENT_SECRET")
+    
+    if not keycloak_url or "company.com" in keycloak_url or not client_secret or "your_keycloak_secret" in client_secret:
+        return False, [], "Keycloak is not configured or using default placeholders."
+        
+    try:
+        # 1. Get access token via client credentials grant
+        token_url = f"{keycloak_url.rstrip('/')}/realms/{realm}/protocol/openid-connect/token"
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret
+        }
+        res = requests.post(token_url, data=data, timeout=3)
+        if res.status_code != 200:
+            return False, [], f"Authentication failed: HTTP {res.status_code}"
+            
+        token = res.json().get("access_token")
+        
+        # 2. Get users in the realm
+        users_url = f"{keycloak_url.rstrip('/')}/admin/realms/{realm}/users"
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+        res_users = requests.get(users_url, headers=headers, params={"max": 100}, timeout=3)
+        if res_users.status_code != 200:
+            return False, [], f"Failed to fetch users: HTTP {res_users.status_code}"
+            
+        users_data = res_users.json()
+        
+        processed_users = []
+        for u in users_data:
+            totp_enabled = u.get("totp", False)
+            processed_users.append({
+                "username": u.get("username"),
+                "email": u.get("email"),
+                "enabled": u.get("enabled", True),
+                "totp": totp_enabled
+            })
+            
+        return True, processed_users, ""
+    except Exception as e:
+        return False, [], f"Connection error: {str(e)}"
+
 def calculate_compliance_metrics(xl):
     try:
+        connected, kc_users, _ = get_keycloak_data()
         df_off = xl.parse("Offboarded Resources")
         df_jc = xl.parse("SecOps_Keycloak")
         
-        # Orphan detection: Offboarded but Keycloak is still 'Active'
-        # Assuming 'Employee ID' is first col in both
-        orphans = 0
-        if "Employee ID" in df_off.columns and "Employee ID" in df_jc.columns:
+        off_ids = []
+        if "Employee ID" in df_off.columns:
             off_ids = [str(x).split('.')[0].strip().lower() for x in df_off["Employee ID"].dropna().unique()]
-            active_jc = [str(x).split('.')[0].strip().lower() for x in df_jc[df_jc["Account Status"].astype(str).str.strip().str.lower() == "active"]["Employee ID"].dropna().unique()]
-            orphans = len(set(off_ids).intersection(set(active_jc)))
             
+        orphans = 0
         mfa_gap = 0
-        if "MFA Enrolled" in df_jc.columns:
-            mfa_gap = len(df_jc[df_jc["MFA Enrolled"].astype(str).str.strip().str.lower() == "no"])
+        
+        if connected and kc_users:
+            df_india = xl.parse("India Employee Database")
+            df_us = xl.parse("US Employee Database")
+            df_emp = pd.concat([df_india, df_us], ignore_index=True)
             
+            email_to_id = {}
+            name_to_id = {}
+            for _, row in df_emp.iterrows():
+                eid = str(row.get("Employee ID")).split('.')[0].strip().lower()
+                name = str(row.get("Employee Name", "")).strip().lower()
+                email = str(row.get("Email", "")).strip().lower()
+                if email:
+                    email_to_id[email] = eid
+                if name:
+                    name_to_id[name] = eid
+                    
+            for u in kc_users:
+                u_email = str(u.get("email", "")).strip().lower()
+                u_name = str(u.get("username", "")).strip().lower()
+                
+                emp_id = email_to_id.get(u_email) or name_to_id.get(u_name)
+                
+                if emp_id:
+                    if emp_id in off_ids and u.get("enabled", True):
+                        orphans += 1
+                    if not u.get("totp", False):
+                        mfa_gap += 1
+                else:
+                    if not u.get("totp", False):
+                        mfa_gap += 1
+        else:
+            if "Employee ID" in df_off.columns and "Employee ID" in df_jc.columns:
+                active_jc = [str(x).split('.')[0].strip().lower() for x in df_jc[df_jc["Account Status"].astype(str).str.strip().str.lower() == "active"]["Employee ID"].dropna().unique()]
+                orphans = len(set(off_ids).intersection(set(active_jc)))
+                
+            if "MFA Enrolled" in df_jc.columns:
+                mfa_gap = len(df_jc[df_jc["MFA Enrolled"].astype(str).str.strip().str.lower() == "no"])
+                
         return orphans, mfa_gap
     except Exception as e:
         print("Error calculating compliance metrics:", e)
         return 0, 0
+
 
 def get_excel_stats(file_path):
     xl = pd.ExcelFile(file_path)

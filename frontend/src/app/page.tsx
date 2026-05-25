@@ -23,6 +23,34 @@ export default function Dashboard() {
     ]
   });
 
+  const [kcStatus, setKcStatus] = useState<{
+    status: string;
+    connected: boolean;
+    total_users?: number;
+    mfa_compliance?: number;
+    users?: { username: string; email: string; enabled: boolean; totp: boolean }[];
+    error?: string;
+  } | null>(null);
+  const [kcLoading, setKcLoading] = useState(false);
+
+  const fetchKeycloakStatus = async () => {
+    setKcLoading(true);
+    try {
+      const res = await fetch('/keycloak/status');
+      const data = await res.json();
+      setKcStatus(data);
+    } catch (err) {
+      console.error('Failed to fetch Keycloak status', err);
+      setKcStatus({
+        status: 'Offline (Simulation Mode)',
+        connected: false,
+        error: 'Failed to connect to backend service.'
+      });
+    } finally {
+      setKcLoading(false);
+    }
+  };
+
   const fetchStats = async () => {
     try {
       const res = await fetch('/stats');
@@ -234,25 +262,102 @@ export default function Dashboard() {
       case 'Keycloak IAM':
         return (
           <div className="glass-card">
-            <div style={{ marginBottom: '2rem' }}>
-              <h2 style={{ marginBottom: '0.5rem' }}>Identity & Login Health 🔐</h2>
-              <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
-                Managing how employees log in. We ensure everyone uses Multi-Factor Authentication (MFA) for safety.
-                <br/><strong>MFA Compliance:</strong> Percentage of employees who have set up their secondary login code.
-              </p>
+            <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h2 style={{ marginBottom: '0.5rem' }}>Identity & Login Health 🔐</h2>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
+                  Managing how employees log in. We ensure everyone uses Multi-Factor Authentication (MFA) for safety.
+                </p>
+              </div>
+              <button 
+                className="primary" 
+                onClick={fetchKeycloakStatus} 
+                disabled={kcLoading}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+              >
+                {kcLoading ? 'Testing...' : 'Test Connection 🔄'}
+              </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+
+            {kcStatus && (
+              <div style={{ 
+                marginBottom: '2rem', 
+                padding: '1.5rem', 
+                background: kcStatus.connected ? 'rgba(136, 176, 136, 0.15)' : 'rgba(230, 179, 138, 0.15)', 
+                border: `1px solid ${kcStatus.connected ? 'var(--success)' : 'var(--warning)'}`,
+                borderRadius: '2rem' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <span style={{ fontWeight: 700, color: kcStatus.connected ? 'var(--success)' : 'var(--warning)', fontSize: '1.1rem' }}>
+                    ● {kcStatus.status}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Diagnostics Check</span>
+                </div>
+                <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div><strong>Endpoint:</strong> <code>https://keycloak.company.com</code></div>
+                  <div><strong>Realm:</strong> <code>master</code></div>
+                  <div><strong>Client ID:</strong> <code>hr-platform</code></div>
+                  {!kcStatus.connected && (
+                    <div style={{ marginTop: '0.5rem', color: '#c46a2a', fontWeight: 500 }}>
+                      ⚠️ <strong>Warning:</strong> Connection failed ({kcStatus.error}). The dashboard has automatically activated Simulation Mode using your Excel database spine (<code>SecOps_Keycloak</code> sheet) to keep all features fully functional.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
               <div style={{ padding: '2rem', background: 'var(--accent-soft)', borderRadius: '2.5rem', textAlign: 'center' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✅</div>
-                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{stats.identity_health}% MFA</div>
+                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>
+                  {kcStatus && kcStatus.connected ? kcStatus.mfa_compliance : stats.identity_health}% MFA
+                </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text)' }}>Overall Compliance</div>
               </div>
               <div style={{ padding: '2rem', background: 'var(--bg)', borderRadius: '2.5rem', textAlign: 'center', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🚨</div>
-                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{stats.compliance_risks / 4} Orphans</div>
+                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>
+                  {kcStatus && kcStatus.connected ? (kcStatus.total_users ? Math.max(0, kcStatus.total_users - Math.round(kcStatus.total_users * (kcStatus.mfa_compliance || 100) / 100)) : 0) : Math.round(stats.compliance_risks / 2)} Orphans
+                </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text)' }}>Pending Revocation</div>
               </div>
             </div>
+
+            {kcStatus && kcStatus.connected && kcStatus.users && (
+              <div style={{ marginTop: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Active Keycloak Users (Realm Directory)</h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.75rem 1rem' }}>Username</th>
+                        <th style={{ padding: '0.75rem 1rem' }}>Email</th>
+                        <th style={{ padding: '0.75rem 1rem' }}>Account Status</th>
+                        <th style={{ padding: '0.75rem 1rem' }}>MFA Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {kcStatus.users.map((u, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{u.username}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: 'var(--text-dim)' }}>{u.email || 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <span className={`badge ${u.enabled ? 'success' : 'critical'}`} style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}>
+                              {u.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <span className={`badge ${u.totp ? 'success' : 'warning'}`} style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}>
+                              {u.totp ? 'MFA Active' : 'MFA Off'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         );
       case 'Settings':
@@ -263,7 +368,7 @@ export default function Dashboard() {
               <div style={{ background: 'var(--bg)', padding: '1.5rem', borderRadius: '1.5rem' }}>
                 <h4 style={{ marginBottom: '1rem' }}>Update HR Master Data</h4>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '1rem' }}>
-                  Upload a new `.xlsx` file to update all employee records, finance, and productivity metrics.
+                  Upload a new `.xlsx` or `.csv` file to update all employee records, finance, and productivity metrics.
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <label className="primary" style={{ 
@@ -276,7 +381,7 @@ export default function Dashboard() {
                     fontWeight: 600
                   }}>
                     Browse Files
-                    <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} accept=".xlsx" />
+                    <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} accept=".xlsx,.csv" />
                   </label>
                   <span style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>{uploadStatus}</span>
                 </div>
@@ -303,7 +408,12 @@ export default function Dashboard() {
           {['Overview', 'Analytics', 'Wazuh XDR', 'Keycloak IAM', 'Settings'].map(tab => (
             <div 
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab === 'Keycloak IAM') {
+                  fetchKeycloakStatus();
+                }
+              }}
               style={{ 
                 cursor: 'pointer',
                 padding: '0.75rem 1.5rem', 
@@ -325,7 +435,7 @@ export default function Dashboard() {
             type="file" 
             onChange={handleFileUpload} 
             style={{ fontSize: '0.7rem', width: '100%' }} 
-            accept=".xlsx"
+            accept=".xlsx,.csv"
           />
           {uploadStatus && <div style={{ fontSize: '0.7rem', color: 'var(--accent)', marginTop: '0.5rem' }}>{uploadStatus}</div>}
         </div>

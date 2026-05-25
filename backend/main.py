@@ -64,6 +64,30 @@ async def get_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/keycloak/status")
+async def get_keycloak_status():
+    try:
+        connected, users, error = rag_engine.get_keycloak_data()
+        if connected:
+            total_users = len(users)
+            mfa_enabled_count = sum(1 for u in users if u.get("totp", False))
+            mfa_percentage = int((mfa_enabled_count / total_users) * 100) if total_users > 0 else 100
+            return {
+                "status": "Connected",
+                "connected": True,
+                "total_users": total_users,
+                "mfa_compliance": mfa_percentage,
+                "users": users[:10]
+            }
+        else:
+            return {
+                "status": "Offline (Simulation Mode)",
+                "connected": False,
+                "error": error
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/chat")
 async def chat(request: QueryRequest):
     try:
