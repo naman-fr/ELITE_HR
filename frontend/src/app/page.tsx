@@ -1,6 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {
+  apiFetch,
+  apiUrl,
+  type ComplianceAlerts,
+  type DashboardStats,
+  type KeycloakStatus,
+  type WazuhStatus,
+} from '@/lib/api';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -10,7 +18,7 @@ export default function Dashboard() {
   ]);
   const [loading, setLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     headcount: 42,
     avg_productivity: 8.4,
     compliance_risks: 8,
@@ -23,21 +31,16 @@ export default function Dashboard() {
     ]
   });
 
-  const [kcStatus, setKcStatus] = useState<{
-    status: string;
-    connected: boolean;
-    total_users?: number;
-    mfa_compliance?: number;
-    users?: { username: string; email: string; enabled: boolean; totp: boolean }[];
-    error?: string;
-  } | null>(null);
+  const [kcStatus, setKcStatus] = useState<KeycloakStatus | null>(null);
   const [kcLoading, setKcLoading] = useState(false);
+  const [wazuhStatus, setWazuhStatus] = useState<WazuhStatus | null>(null);
+  const [complianceAlerts, setComplianceAlerts] = useState<ComplianceAlerts | null>(null);
+  const [wazuhLoading, setWazuhLoading] = useState(false);
 
   const fetchKeycloakStatus = async () => {
     setKcLoading(true);
     try {
-      const res = await fetch('/keycloak/status');
-      const data = await res.json();
+      const data = await apiFetch<KeycloakStatus>('/keycloak/status');
       setKcStatus(data);
     } catch (err) {
       console.error('Failed to fetch Keycloak status', err);
@@ -51,20 +54,44 @@ export default function Dashboard() {
     }
   };
 
+  const fetchWazuhStatus = async () => {
+    setWazuhLoading(true);
+    try {
+      const data = await apiFetch<WazuhStatus>('/wazuh/status');
+      setWazuhStatus(data);
+    } catch (err) {
+      console.error('Failed to fetch Wazuh status', err);
+      setWazuhStatus({
+        status: 'Offline (Simulation Mode)',
+        connected: false,
+        error: 'Failed to connect to backend service.',
+      });
+    } finally {
+      setWazuhLoading(false);
+    }
+  };
+
+  const fetchComplianceAlerts = async () => {
+    try {
+      const data = await apiFetch<ComplianceAlerts>('/compliance/alerts');
+      setComplianceAlerts(data);
+    } catch (err) {
+      console.error('Failed to fetch compliance alerts', err);
+    }
+  };
+
   const fetchStats = async () => {
     try {
-      const res = await fetch('/stats');
-      const data = await res.json();
-      if (!data.error) {
-        setStats(data);
-      }
+      const data = await apiFetch<DashboardStats>('/stats');
+      setStats(data);
     } catch (err) {
       console.error('Failed to fetch stats', err);
     }
   };
 
   useEffect(() => {
-    fetchStats();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount bootstrap
+    void Promise.all([fetchStats(), fetchWazuhStatus(), fetchComplianceAlerts()]);
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,7 +103,7 @@ export default function Dashboard() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('/upload', {
+      const res = await fetch(apiUrl('/upload'), {
         method: 'POST',
         body: formData,
       });
@@ -86,10 +113,12 @@ export default function Dashboard() {
       // Refresh stats after upload
       if (res.ok) {
         fetchStats();
+        fetchWazuhStatus();
+        fetchComplianceAlerts();
       }
 
       setTimeout(() => setUploadStatus(''), 3000);
-    } catch (err) {
+    } catch {
       setUploadStatus('Error uploading file');
     }
   };
@@ -108,14 +137,13 @@ export default function Dashboard() {
     setLoading(true);
 
     try {
-      const res = await fetch('/chat', {
+      const data = await apiFetch<{ response: string }>('/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, history: historyToSend }),
       });
-      const data = await res.json();
       setMessages(prev => [...prev, { role: 'ai', content: data.response }]);
-    } catch (err) {
+    } catch {
       setMessages(prev => [...prev, { role: 'ai', content: 'Oh no! I lost my connection for a moment. Please check the backend. 🌿' }]);
     } finally {
       setLoading(false);
@@ -161,20 +189,23 @@ export default function Dashboard() {
                   <span style={{ fontWeight: 600 }}> If you see a Red alert, it means a device is at risk.</span>
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg)', borderRadius: '1.5rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>Orphaned Account: Priya Harris</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Offboarded but Keycloak active</div>
+                  {(complianceAlerts?.alerts?.length
+                    ? complianceAlerts.alerts.slice(0, 4)
+                    : wazuhStatus?.alerts?.filter(a => a.risk !== 'Safe').slice(0, 4) ?? []
+                  ).map(item => (
+                    <div key={`${item.name}-${item.device}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg)', borderRadius: '1.5rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{item.risk}: {item.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{item.device}</div>
+                      </div>
+                      <span className={`badge ${item.risk === 'Account Orphaned' ? 'critical' : 'warning'}`}>
+                        {item.risk === 'Account Orphaned' ? 'Critical' : 'Warning'}
+                      </span>
                     </div>
-                    <span className="badge critical">Critical</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg)', borderRadius: '1.5rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>MFA Gap: Kiran Verma</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Keycloak policy violation</div>
-                    </div>
-                    <span className="badge warning">Warning</span>
-                  </div>
+                  ))}
+                  {!complianceAlerts?.alerts?.length && !wazuhStatus?.alerts?.length && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>No active compliance alerts detected. 🌿</div>
+                  )}
                 </div>
               </div>
               <div className="glass-card">
@@ -233,29 +264,57 @@ export default function Dashboard() {
       case 'Wazuh XDR':
         return (
           <div className="glass-card">
-            <div style={{ marginBottom: '2rem' }}>
-              <h2 style={{ marginBottom: '0.5rem' }}>Device Compliance Center 🛡️</h2>
-              <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
-                This panel shows the safety status of every employee's computer. 
-                <br/><strong>Endpoint:</strong> The name of the laptop.
-                <br/><strong>XDR Status:</strong> Green means the security software is active and updated.
-              </p>
+            <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ marginBottom: '0.5rem' }}>Device Compliance Center 🛡️</h2>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
+                  This panel shows the safety status of every employee&apos;s computer.
+                  <br/><strong>Endpoint:</strong> The name of the laptop.
+                  <br/><strong>XDR Status:</strong> Green means the security software is active and updated.
+                </p>
+              </div>
+              <button
+                className="primary"
+                onClick={fetchWazuhStatus}
+                disabled={wazuhLoading}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+              >
+                {wazuhLoading ? 'Refreshing...' : 'Refresh Status 🔄'}
+              </button>
             </div>
+            {wazuhStatus && (
+              <div style={{
+                marginBottom: '1.5rem',
+                padding: '1rem 1.5rem',
+                background: wazuhStatus.connected ? 'rgba(136, 176, 136, 0.15)' : 'rgba(230, 179, 138, 0.15)',
+                borderRadius: '1.5rem',
+                fontSize: '0.85rem',
+              }}>
+                ● {wazuhStatus.status}
+                {wazuhStatus.total_agents !== undefined && (
+                  <span style={{ marginLeft: '1rem', color: 'var(--text-dim)' }}>
+                    {wazuhStatus.safe_agents}/{wazuhStatus.total_agents} endpoints safe
+                  </span>
+                )}
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[
-                { name: 'Aditya Taylor', device: 'LAPTOP-IN-1040', risk: 'Safe', color: 'var(--success)' },
-                { name: 'Kiran Verma', device: 'LAPTOP-IN-1005', risk: 'MFA Warning', color: 'var(--warning)' },
-                { name: 'Priya Harris', device: 'LAPTOP-US-2013', risk: 'Account Orphaned', color: 'var(--danger)' },
-                { name: 'Deepa Pillai', device: 'LAPTOP-IN-1045', risk: 'Safe', color: 'var(--success)' }
-              ].map(item => (
-                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', background: 'var(--bg)', borderRadius: '1.5rem' }}>
+              {(wazuhStatus?.alerts ?? []).map(item => (
+                <div key={`${item.name}-${item.device}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', background: 'var(--bg)', borderRadius: '1.5rem' }}>
                   <div>
                     <div style={{ fontWeight: 600 }}>{item.name}</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{item.device}</div>
                   </div>
-                  <div style={{ color: item.color, fontWeight: 700, fontSize: '0.9rem' }}>{item.risk}</div>
+                  <div style={{
+                    color: item.risk === 'Safe' ? 'var(--success)' : item.risk === 'MFA Warning' ? 'var(--warning)' : 'var(--danger)',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                  }}>{item.risk}</div>
                 </div>
               ))}
+              {!wazuhStatus?.alerts?.length && (
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>No endpoint data available yet.</div>
+              )}
             </div>
           </div>
         );
@@ -412,6 +471,9 @@ export default function Dashboard() {
                 setActiveTab(tab);
                 if (tab === 'Keycloak IAM') {
                   fetchKeycloakStatus();
+                }
+                if (tab === 'Wazuh XDR') {
+                  fetchWazuhStatus();
                 }
               }}
               style={{ 
