@@ -8,91 +8,135 @@ app_port: 7860
 pinned: false
 ---
 
-# 🌿 ELITE HR Intelligence Platform v2.0
+# 🌿 ELITE HR Intelligence Platform v2.1
 
 ![Platform Header](frontend/public/preview.png)
 
 > **The Boardroom-Ready HRMIS + AI + SecOps Suite.**  
-> *Consolidate workforce data, predict employee risk, and empower your HR team with a conversational AI co-pilot—all in one premium, high-performance interface.*
+> Consolidate workforce data, predict employee risk, and empower your HR team with a conversational AI co-pilot—all in one premium, high-performance interface.
 
 ---
 
-## 🚀 Overview
+## Overview
 
-ELITE HR is a production-grade Intelligence Platform designed for modern HR teams. It bridges the gap between static spreadsheets and fragmented security tools by unifying **Workforce Analytics**, **Identity Management**, and **Security Telemetry** into a single, AI-powered dashboard.
+ELITE HR is an industrial-grade HR intelligence platform that unifies **Workforce Analytics**, **Identity Management (Keycloak)**, and **Security Telemetry (Wazuh XDR)** with a Task-Oriented Dialogue (TOD) AI co-pilot.
 
-### 💎 Key Pillars
-- **🧠 Hybrid AI Co-pilot**: Powered by Groq (Llama 3.1) or OpenAI (GPT-4o), capable of complex HR reasoning with full context from your datasets.
-- **📊 Real-time Analytics**: Live workforce KPIs, attrition trends, and department-level productivity metrics.
-- **🛡️ SecOps Intelligence**: Integrated monitoring of device health (Wazuh) and identity security (Keycloak MFA).
-- **🔄 Universal Excel Transformer**: Intelligent ingestion layer that maps any Excel format to the platform's master specification.
+### Key capabilities
+
+| Pillar | Description |
+|--------|-------------|
+| **Hybrid AI Co-pilot** | Groq (`llama-3.3-70b-versatile`) or OpenAI (`gpt-4o`) with ChromaDB RAG |
+| **Real-time Analytics** | Live headcount, productivity, department distribution |
+| **SecOps Intelligence** | Wazuh endpoint monitoring + Keycloak MFA compliance |
+| **Universal Data Transformer** | Excel/CSV ingestion mapped to the master HR schema |
 
 ---
 
-## 🛠️ Technology Stack
+## Technology stack
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | Next.js 14 (App Router), TypeScript, Tailwind CSS (Custom Premium Theme) |
-| **Backend** | FastAPI (Python 3.11), Uvicorn |
-| **AI Engine** | Groq (Llama 3.1 70B) / OpenAI (GPT-4o) |
-| **Vector Store** | ChromaDB (Persistent Local Storage) |
-| **Security** | Wazuh XDR Integration, Keycloak IAM |
-| **Deployment** | Docker & Docker Compose |
+| **Frontend** | Next.js 16 (App Router), React 19, TypeScript, custom CSS design system |
+| **Backend** | FastAPI, Pydantic Settings, Uvicorn, SlowAPI rate limiting |
+| **AI Engine** | Groq / OpenAI with ChromaDB vector store |
+| **Security** | Wazuh XDR, Keycloak IAM (live API + Excel simulation fallback) |
+| **Deployment** | Docker Compose, Hugging Face Spaces (unified container) |
+| **Quality** | GitHub Actions CI, pytest, Ruff, ESLint |
 
 ---
 
-## ⚡ Quick Start
+## Quick start
 
-### 1. Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
-- An API Key from [Groq](https://console.groq.com/) or [OpenAI](https://platform.openai.com/).
+### Prerequisites
 
-### 2. Environment Configuration
-Clone the repository and create your `.env` file:
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Groq or OpenAI API key
+
+### 1. Configure environment
+
 ```bash
+git clone https://github.com/naman-fr/ELITE_HR.git
+cd ELITE_HR
 cp .env.example .env
 ```
-Edit `.env` and provide your API keys:
+
+Edit `.env` and set at minimum:
+
 ```env
-OPENAI_API_KEY=gsk_your_groq_key_here  # Groq and OpenAI keys are both supported!
-WAZUH_API_KEY=your_key
-KEYCLOAK_TOKEN=your_token
+OPENAI_API_KEY=gsk_your_groq_key_here
 ```
 
-### 3. Launch the Platform
-Run the following command to build and start the entire stack:
+### 2. Launch (split stack — recommended for local dev)
+
 ```bash
-docker-compose up --build -d
+docker compose up --build
+```
+
+| Service | URL |
+|---------|-----|
+| Dashboard | http://localhost:3000 |
+| API docs | http://localhost:8000/docs |
+| Health | http://localhost:8000/health |
+
+### 3. Launch (unified — Hugging Face parity)
+
+```bash
+docker compose --profile unified up --build app
+```
+
+Access at http://localhost:7860
+
+---
+
+## API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Service health and configuration summary |
+| `GET` | `/stats` | Workforce KPIs from master Excel |
+| `GET` | `/wazuh/status` | Endpoint security status (live or simulation) |
+| `GET` | `/keycloak/status` | IAM/MFA compliance (live or simulation) |
+| `GET` | `/compliance/alerts` | Active compliance alerts |
+| `POST` | `/upload` | Transform and ingest Excel/CSV |
+| `POST` | `/chat` | AI co-pilot (rate-limited) |
+| `POST` | `/ingest` | Re-index master data into ChromaDB |
+
+---
+
+## Using your data
+
+1. Open the **Settings** tab in the dashboard.
+2. Upload `.xlsx` or `.csv` employee data.
+3. The Universal Excel Transformer maps columns to the master schema.
+4. Dashboard metrics and the AI co-pilot refresh automatically.
+
+---
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, testing, and PR guidelines.
+
+```bash
+# Backend tests
+cd backend && pytest -q
+
+# Frontend lint + build
+cd frontend && npm run lint && npm run build
 ```
 
 ---
 
-## 🖥️ Accessing the Platform
+## AI co-pilot examples
 
-Once the containers are running, you can access the platform via your browser:
-
-- **🌐 Frontend Dashboard**: [http://localhost:3000](http://localhost:3000)
-- **🔌 Backend API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-
-### 📂 Using Your Data
-1. Navigate to the **Settings** tab.
-2. Use the **Universal Excel Transformer** to upload your existing employee spreadsheets.
-3. The platform will automatically map your columns and refresh the entire dashboard in real-time.
-
----
-
-## 🧠 AI Co-pilot Capabilities
-The ELITE HR Co-pilot isn't just a chatbot; it's a strategic partner. You can ask:
 - *"Who are our highest flight risks in Engineering this quarter?"*
 - *"Show all orphaned accounts from the last offboarding cycle."*
-- *"Draft a Performance Improvement Plan (PIP) for Employee X based on their productivity dip."*
-- *"Which employees have not yet enrolled in MFA?*
+- *"Which employees have not yet enrolled in MFA?"*
+- *"Draft a PIP for Employee X based on their productivity dip."*
 
 ---
 
-## 📜 License
-Internal Engineering Use | © 2026 ELITE HR Technologies.
+## License
 
----
-*Built with ❤️ for Global HR Teams.*
+[MIT License](LICENSE) — © 2026 ELITE HR Technologies
+
+Built for global HR teams. 🌿
