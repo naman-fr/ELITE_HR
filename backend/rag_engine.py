@@ -1,28 +1,31 @@
-import os
-import pandas as pd
-from openai import OpenAI
-import chromadb
-from chromadb.utils import embedding_functions
-from dotenv import load_dotenv
 import json
+import logging
+import os
 import re
 
-load_dotenv()
+import chromadb
+import pandas as pd
+from dotenv import load_dotenv
+from openai import OpenAI
 
-# Groq/OpenAI Config
-API_KEY = os.getenv("OPENAI_API_KEY")
-BASE_URL = "https://api.groq.com/openai/v1" if str(API_KEY).startswith("gsk_") else None
+from config import get_settings
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+settings = get_settings()
+API_KEY = settings.openai_api_key
+BASE_URL = settings.llm_base_url
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
-DEFAULT_MODEL = "llama-3.3-70b-versatile" if BASE_URL else "gpt-4o"
+DEFAULT_MODEL = settings.llm_model
 
-# Wazuh Cloud Config
-WAZUH_API_KEY = os.getenv("WAZUH_API_KEY")
-WAZUH_URL = os.getenv("WAZUH_API_URL", "https://api.cloud.wazuh.com/v2")
-
-# Local ChromaDB
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
+chroma_client = chromadb.PersistentClient(path=str(settings.chroma_db_path))
 collection = chroma_client.get_or_create_collection(name="hr_data")
+
+
+def resolve_excel_path() -> str:
+    return str(settings.resolve_master_excel())
 
 def serialize_excel(file_path):
     # Load sheets
@@ -36,28 +39,37 @@ def serialize_excel(file_path):
                 chunk = f"SHEET: {sheet}\n"
                 for col in df.columns:
                     chunk += f"{col}: {row[col]}\n"
+                emp_id = str(row.get("Employee ID", "unknown"))
                 all_chunks.append({
-                    "id": str(row.get("Employee ID", "unknown")),
+                    "id": f"{sheet}_{emp_id}",
                     "text": chunk,
-                    "metadata": {"sheet": sheet, "emp_id": str(row.get("Employee ID", ""))}
+                    "metadata": {"sheet": sheet, "emp_id": emp_id}
                 })
     return all_chunks
 
 def ingest_data(file_path):
+    global collection
     chunks = serialize_excel(file_path)
-    
-    ids = [c["id"] for c in chunks]
-    documents = [c["text"] for c in chunks]
-    metadatas = [c["metadata"] for c in chunks]
-    
-    # Simple embedding using OpenAI
-    # (In production, use a more efficient way to embed in batches)
+    if not chunks:
+        logger.warning("No employee records found to ingest from %s", file_path)
+        return
+
+    try:
+        chroma_client.delete_collection("hr_data")
+    except Exception:
+        pass
+    collection = chroma_client.get_or_create_collection(name="hr_data")
+
+    ids = [chunk["id"] for chunk in chunks]
+    documents = [chunk["text"] for chunk in chunks]
+    metadatas = [chunk["metadata"] for chunk in chunks]
+
     collection.add(
         ids=ids,
         documents=documents,
-        metadatas=metadatas
+        metadatas=metadatas,
     )
-    print(f"Ingested {len(chunks)} records into vector store.")
+    logger.info("Ingested %s records into vector store.", len(chunks))
 
 def query_rag(query_text):
     results = collection.query(
@@ -461,11 +473,7 @@ def handle_query(query, history=None):
     if history is None:
         history = []
         
-    excel_path = "../ELITE_HR_Master_Dashboard.xlsx"
-    if not os.path.exists(excel_path):
-        excel_path = "ELITE_HR_Master_Dashboard.xlsx"
-        if not os.path.exists(excel_path):
-            excel_path = "../ELITE_HR_Master_Dashboard.xlsx"
+    excel_path = resolve_excel_path()
             
     # Dialogue State Tracking
     dst_state = analyze_dialogue_state(query, history)
@@ -526,10 +534,10 @@ def get_keycloak_data():
     Returns (connected: bool, users: list, error: str)
     """
     import requests
-    keycloak_url = os.getenv("KEYCLOAK_URL")
-    realm = os.getenv("KEYCLOAK_REALM", "master")
-    client_id = os.getenv("KEYCLOAK_CLIENT_ID", "hr-platform")
-    client_secret = os.getenv("KEYCLOAK_CLIENT_SECRET")
+    keycloak_url = settings.keycloak_url
+    realm = settings.keycloak_realm
+    client_id = settings.keycloak_client_id
+    client_secret = settings.keycloak_client_secret
     
     if not keycloak_url or "company.com" in keycloak_url or not client_secret or "your_keycloak_secret" in client_secret:
         return False, [], "Keycloak is not configured or using default placeholders."
