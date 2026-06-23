@@ -6,15 +6,42 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      - MASTER_EXCEL_PATH=/data/ELITE_HR_Master_Dashboard.xlsx
+      - APP_ENV=production
+    volumes:
+      - ./backend/chroma_db:/app/chroma_db
+      - ./ELITE_HR_Master_Dashboard.xlsx:/data/ELITE_HR_Master_Dashboard.xlsx
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Single-container deployment profile for Hugging Face / production parity
+  app:
+    profiles: ["unified"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "7860:7860"
+    env_file: .env
     volumes:
       - ./backend/chroma_db:/app/chroma_db
       - ./ELITE_HR_Master_Dashboard.xlsx:/ELITE_HR_Master_Dashboard.xlsx
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      - backend
+    restart: unless-stopped
